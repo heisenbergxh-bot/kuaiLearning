@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { LessonRenderer } from '../components/LessonRenderer';
 import { useTranslation } from '../i18n/useTranslation';
@@ -13,18 +13,19 @@ export function ReferencesPage() {
   const { t } = useTranslation();
   const rendererWrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (workspaceId) loadReferences();
-  }, [workspaceId]);
 
-  const loadReferences = async () => {
+  const loadReferences = useCallback(async () => {
     setLoading(true);
     const result = await db.references.where('workspaceId').equals(workspaceId!).toArray();
     setReferences(
       result.sort((a, b) => (a.sourceLessonNumber ?? 0) - (b.sourceLessonNumber ?? 0)),
     );
     setLoading(false);
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) void loadReferences();
+  }, [workspaceId, loadReferences]);
 
   const handlePrint = () => {
     const iframe = rendererWrapperRef.current?.querySelector('iframe');

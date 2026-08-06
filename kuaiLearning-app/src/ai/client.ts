@@ -8,6 +8,8 @@ import {
   type ParsedSyllabusItem,
 } from './prompts';
 import { db } from '../db';
+import { readChatCompletionStream } from './streaming';
+import { fetchAI } from './request';
 
 type AIStreamCallback = (chunk: string) => void;
 
@@ -29,7 +31,7 @@ export async function generateSyllabus(
 
   const systemPrompt = buildSyllabusPrompt(workspace, learningRecords, keepItems, settings.language, mode, userRequest);
 
-  const response = await fetch(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -79,7 +81,7 @@ export async function generateLesson(
 
   const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
 
-  const response = await fetch(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -128,7 +130,7 @@ export async function generateLessonStream(
 
   const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
 
-  const response = await fetch(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -151,35 +153,8 @@ export async function generateLessonStream(
     throw new Error(`AI API error: ${response.status} ${err}`);
   }
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  const decoder = new TextDecoder();
-  let fullContent = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-
-    for (const line of lines) {
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) {
-          fullContent += content;
-          onChunk?.(content);
-        }
-      } catch {
-        // Skip unparseable chunks
-      }
-    }
-  }
+  if (!response.body) throw new Error('No response body');
+  const fullContent = await readChatCompletionStream(response.body, onChunk);
 
   return parseLessonResponse(fullContent);
 }
@@ -206,7 +181,7 @@ export async function chatWithAI(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const response = await fetch(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

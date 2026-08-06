@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import { GlossaryTermCard } from '../components/GlossaryTermCard';
@@ -16,16 +16,17 @@ export function GlossaryPage() {
   const [category, setCategory] = useState('');
   const { t } = useTranslation();
 
-  useEffect(() => {
-    if (workspaceId) loadTerms();
-  }, [workspaceId]);
 
-  const loadTerms = async () => {
+  const loadTerms = useCallback(async () => {
     setLoading(true);
     const result = await db.glossaryTerms.where('workspaceId').equals(workspaceId!).toArray();
     setTerms(result.sort((a, b) => a.term.localeCompare(b.term)));
     setLoading(false);
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) void loadTerms();
+  }, [workspaceId, loadTerms]);
 
   const handleCreate = async () => {
     if (!workspaceId || !term.trim() || !definition.trim()) return;

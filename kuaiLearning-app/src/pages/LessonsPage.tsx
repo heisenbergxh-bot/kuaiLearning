@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
@@ -23,24 +23,25 @@ export function LessonsPage() {
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState('');
 
-  useEffect(() => {
-    if (workspaceId) {
-      loadLessons();
-      loadSyllabus();
-    }
-  }, [workspaceId]);
 
-  const loadLessons = async () => {
+  const loadLessons = useCallback(async () => {
     setLoading(true);
     const result = await db.lessons.where('workspaceId').equals(workspaceId!).toArray();
     setLessons(result.sort((a, b) => b.number - a.number));
     setLoading(false);
-  };
+  }, [workspaceId]);
 
-  const loadSyllabus = async () => {
+  const loadSyllabus = useCallback(async () => {
     const result = await db.syllabusItems.where('workspaceId').equals(workspaceId!).toArray();
     setSyllabus(result.sort((a, b) => a.order - b.order));
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) {
+      void loadLessons();
+      void loadSyllabus();
+    }
+  }, [workspaceId, loadLessons, loadSyllabus]);
 
   const handleGenerateSyllabus = async (mode: 'full' | 'replan', guidance?: string) => {
     if (!workspaceId || !settings.apiKey || generating) return;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import type { Resource } from '../types';
@@ -15,16 +15,17 @@ export function ResourcesPage() {
   const [description, setDescription] = useState('');
   const { t } = useTranslation();
 
-  useEffect(() => {
-    if (workspaceId) loadResources();
-  }, [workspaceId]);
 
-  const loadResources = async () => {
+  const loadResources = useCallback(async () => {
     setLoading(true);
     const result = await db.resources.where('workspaceId').equals(workspaceId!).toArray();
     setResources(result.sort((a, b) => b.createdAt - a.createdAt));
     setLoading(false);
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) void loadResources();
+  }, [workspaceId, loadResources]);
 
   const handleCreate = async () => {
     if (!workspaceId || !title.trim() || !url.trim()) return;

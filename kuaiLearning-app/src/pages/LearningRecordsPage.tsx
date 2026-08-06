@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import type { LearningRecord } from '../types';
@@ -15,16 +15,17 @@ export function LearningRecordsPage() {
   const [implications, setImplications] = useState('');
   const { t } = useTranslation();
 
-  useEffect(() => {
-    if (workspaceId) loadRecords();
-  }, [workspaceId]);
 
-  const loadRecords = async () => {
+  const loadRecords = useCallback(async () => {
     setLoading(true);
     const result = await db.learningRecords.where('workspaceId').equals(workspaceId!).toArray();
     setRecords(result.sort((a, b) => b.number - a.number));
     setLoading(false);
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) void loadRecords();
+  }, [workspaceId, loadRecords]);
 
   const handleCreate = async () => {
     if (!workspaceId || !title.trim() || !content.trim()) return;

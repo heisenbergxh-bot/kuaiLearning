@@ -30,6 +30,10 @@ export async function generateAndSaveLesson(
   );
 
   const now = Date.now();
+  return db.transaction('rw', [
+    db.lessons, db.syllabusItems, db.quizQuestions, db.glossaryTerms,
+    db.learningRecords, db.references, db.resources,
+  ], async () => {
   let number = reuseNumber;
   if (number == null) {
     const lessons = await db.lessons.where('workspaceId').equals(workspaceId).toArray();
@@ -136,6 +140,7 @@ export async function generateAndSaveLesson(
   }
 
   return lesson;
+  });
 }
 
 // Delete a lesson and all data derived from it. Does NOT touch the linked

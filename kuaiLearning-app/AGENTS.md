@@ -110,6 +110,10 @@ All colors are CSS custom properties defined in `src/index.css` via `@theme`:
 - Dark: triggered by `prefers-color-scheme: dark`
 - Use `var(--color-*)` in components, not hardcoded hex values
 
-## No tests exist
+## Tests
 
-The project has no test setup, no test files, and no test commands. TypeScript type-checking (`tsc -b`) is the primary correctness gate.
+Vitest is the unit and integration test runner. Tests live beside source files as
+`*.test.ts`. jsdom supplies DOM APIs and fake-indexeddb supplies IndexedDB in
+Node-based integration tests.
+
+Run `npm test` for a single pass or `npm run test:watch` while developing.

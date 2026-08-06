@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import type { QuizQuestion } from '../types';
@@ -30,16 +30,17 @@ export function QuizBankPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [sessionCorrect, setSessionCorrect] = useState(0);
 
-  useEffect(() => {
-    if (workspaceId) loadQuestions();
-  }, [workspaceId]);
 
-  const loadQuestions = async () => {
+  const loadQuestions = useCallback(async () => {
     setLoading(true);
     const result = await db.quizQuestions.where('workspaceId').equals(workspaceId!).toArray();
     setQuestions(result.sort((a, b) => a.lessonNumber - b.lessonNumber || a.createdAt - b.createdAt));
     setLoading(false);
-  };
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId) void loadQuestions();
+  }, [workspaceId, loadQuestions]);
 
   const lessonNumbers = Array.from(new Set(questions.map(q => q.lessonNumber))).sort((a, b) => a - b);
   const filtered = lessonFilter === 'all' ? questions : questions.filter(q => q.lessonNumber === lessonFilter);

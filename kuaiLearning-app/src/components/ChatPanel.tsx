@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTranslation } from '../i18n/useTranslation';
 import { chatWithAI } from '../ai/client';
@@ -19,9 +19,6 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadMessages();
-  }, [lessonId]);
 
   useEffect(() => {
     // Scroll only the chat container to its bottom — NOT scrollIntoView, which
@@ -32,13 +29,17 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     const msgs = await db.chatMessages
       .where('lessonId')
       .equals(lessonId)
       .sortBy('createdAt');
     setMessages(msgs);
-  };
+  }, [lessonId]);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
 
   const handleSend = async () => {
     const text = input.trim();
