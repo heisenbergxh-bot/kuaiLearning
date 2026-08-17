@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Workspace, Lesson, LearningRecord, GlossaryTerm, Resource, Reference, ChatMessage, QuizQuestion, SyllabusItem } from '../types';
+export { generateId } from '../lib/generateId';
 
 export class KuaiLearningDB extends Dexie {
   workspaces!: EntityTable<Workspace, 'id'>;
@@ -68,8 +69,3 @@ export class KuaiLearningDB extends Dexie {
 }
 
 export const db = new KuaiLearningDB();
-
-// Helper to generate IDs
-export function generateId(): string {
-  return crypto.randomUUID();
-}
