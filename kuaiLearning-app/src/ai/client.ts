@@ -8,6 +8,7 @@ import {
   type ParsedSyllabusItem,
 } from './prompts';
 import { db } from '../db';
+import { getLessonTheme } from '../lib/lessonThemes';
 import { readChatCompletionStream } from './streaming';
 import { fetchAI } from './request';
 
@@ -79,7 +80,7 @@ export async function generateLesson(
   const syllabus = (await db.syllabusItems.where('workspaceId').equals(workspaceId).toArray()).sort((a, b) => a.order - b.order);
   const targetItem = targetItemId ? syllabus.find(s => s.id === targetItemId) : undefined;
 
-  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
+  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem, getLessonTheme(settings.lessonTheme));
 
   const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',
@@ -128,7 +129,7 @@ export async function generateLessonStream(
   const syllabus = (await db.syllabusItems.where('workspaceId').equals(workspaceId).toArray()).sort((a, b) => a.order - b.order);
   const targetItem = targetItemId ? syllabus.find(s => s.id === targetItemId) : undefined;
 
-  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
+  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem, getLessonTheme(settings.lessonTheme));
 
   const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
     method: 'POST',

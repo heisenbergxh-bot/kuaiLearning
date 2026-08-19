@@ -258,3 +258,145 @@ body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ThinkingBox animations */
+@keyframes kuai-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes kuai-pulse-ring {
+  0% { transform: scale(1); opacity: 0.5; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes kuai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes kuai-dot {
+  0%, 60%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+}
+
+.thinking-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--color-text-muted) 0%,
+    var(--color-text-muted) 40%,
+    var(--color-accent) 50%,
+    var(--color-text-muted) 60%,
+    var(--color-text-muted) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: kuai-shimmer 1.8s linear infinite;
+}
+
+.thinking-orb-ring {
+  animation: kuai-pulse-ring 1.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.thinking-cursor {
+  animation: kuai-cursor-blink 1s steps(1) infinite;
+}
+
+.thinking-dots span {
+  animation: kuai-dot 1.2s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-shimmer-text,
+  .thinking-orb-ring,
+  .thinking-cursor,
+  .thinking-dots span {
+    animation: none;
+  }
+
+  .thinking-shimmer-text {
+    color: var(--color-text-muted);
+    background: none;
+  }
+}
+
+/* QuizBank motion system */
+@keyframes kuai-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kuai-slide-next {
+  from { opacity: 0; transform: translateX(26px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes kuai-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
+}
+
+@keyframes kuai-pop {
+  0% { transform: scale(0.97); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+@keyframes kuai-ring-draw {
+  from { stroke-dashoffset: var(--ring-c); }
+}
+
+.quiz-question-enter {
+  animation: kuai-slide-next 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quiz-option-enter {
+  animation: kuai-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quiz-feedback-enter {
+  animation: kuai-rise 0.25s ease-out both;
+}
+
+.quiz-list-item {
+  animation: kuai-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quiz-pop {
+  animation: kuai-pop 0.35s ease-out;
+}
+
+.quiz-shake {
+  animation: kuai-shake 0.45s ease-in-out;
+}
+
+.quiz-ring {
+  transition: stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-question-enter,
+  .quiz-option-enter,
+  .quiz-feedback-enter,
+  .quiz-list-item,
+  .quiz-pop,
+  .quiz-shake {
+    animation: none;
+  }
+
+  .quiz-ring {
+    transition: none;
+  }
+}

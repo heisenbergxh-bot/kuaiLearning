@@ -1,4 +1,5 @@
 import type { AIGenerateLessonResponse, Language, Lesson, LearningRecord, GlossaryTerm, Workspace, SyllabusItem } from '../types';
+import { getLessonTheme, themeVarsPromptLine, type LessonTheme } from '../lib/lessonThemes';
 
 // ===== Syllabus (course roadmap) =====
 
@@ -94,6 +95,7 @@ export function buildLessonPrompt(
   userRequest?: string,
   syllabus: SyllabusItem[] = [],
   targetItem?: SyllabusItem,
+  theme: LessonTheme = getLessonTheme(),
 ): string {
   const lessonNumbers = lessons.map(l => l.number);
   const nextNumber = lessonNumbers.length > 0 ? Math.max(...lessonNumbers) + 1 : 1;
@@ -201,10 +203,10 @@ Rules for the format:
 ## HTML Content Requirements (for the LESSON_HTML section)
 - The lesson HTML MUST be a COMPLETE, STANDALONE HTML document (<!DOCTYPE html>...<html>...</html>)
 - Use inline <style> for all CSS — NO external references
-- Use a **LIGHT theme** and DEFINE these CSS custom properties yourself in :root with concrete light-mode values (do NOT leave them undefined, and do NOT rely on dark mode):
-  \`:root{ --bg:#ffffff; --bg-card:#faf9f7; --text:#374151; --text-heading:#111827; --text-muted:#6b7280; --border:#e5e7eb; --accent:#6366f1; --accent-light:#eef2ff; --accent-border:#c7d2fe; }\`
+- Use the **"${theme.name.en}" document theme** (a LIGHT theme): DEFINE these CSS custom properties yourself in :root with exactly these values (do NOT leave them undefined, and do NOT rely on dark mode):
+  \`${themeVarsPromptLine(theme)}\`
 - The <body> MUST set \`background: var(--bg)\` and \`color: var(--text)\` so the page is always readable on a light background with dark text.
-- Design: clean, Tufte-inspired, readable typography. max-width ~42rem centered.
+- Design language: ${theme.styleHint}. Generous line-height (~1.9), hairline rules instead of heavy boxes or shadows, and the theme's single accent used sparingly. max-width ~46rem centered.
 - Structure:
   1. Title + a short intro paragraph that motivates WHY this matters for the student's mission
   2. **Core teaching section — this is the bulk of the lesson. Cover 2-3 key concepts, and for EACH concept go deep using this layered structure:**

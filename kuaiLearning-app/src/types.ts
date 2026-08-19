@@ -124,6 +124,8 @@ export interface Settings {
   apiBaseUrl: string;
   model: string;
   language: Language;
+  /** Selected document theme id (see lib/lessonThemes.ts) */
+  lessonTheme?: string;
 }
 
 export interface AIGenerateRequest {

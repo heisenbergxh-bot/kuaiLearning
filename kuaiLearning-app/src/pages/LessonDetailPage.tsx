@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { LessonRenderer } from '../components/LessonRenderer';
 import { ChatPanel } from '../components/ChatPanel';
 import { GlossaryTermCard } from '../components/GlossaryTermCard';
+import { ThinkingBox, type ThinkingPhase } from '../components/ThinkingBox';
+import { extractToc } from '../lib/extractToc';
+import { LessonToc } from '../components/LessonToc';
+import { getLessonTheme } from '../lib/lessonThemes';
 import { useTranslation } from '../i18n/useTranslation';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { generateAndSaveLesson, deleteLessonCascade } from '../lib/lessonGen';
@@ -24,13 +28,82 @@ export function LessonDetailPage() {
   const [terms, setTerms] = useState<GlossaryTerm[]>([]);
   const [linkedItem, setLinkedItem] = useState<SyllabusItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [quizResults, setQuizResults] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 });
   const [regenOpen, setRegenOpen] = useState(false);
   const [regenText, setRegenText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [busyStatus, setBusyStatus] = useState('');
+  const [regenPhase, setRegenPhase] = useState<ThinkingPhase | null>(null);
+  const [regenStream, setRegenStream] = useState('');
+  const [regenError, setRegenError] = useState('');
+  const [regenStartedAt, setRegenStartedAt] = useState<number | null>(null);
   const { t } = useTranslation();
   const refWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Table of contents (auto-generated from the lesson HTML headings)
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const toc = useMemo(() => extractToc(lesson?.htmlContent || ''), [lesson?.htmlContent]);
+  const [activeToc, setActiveToc] = useState<string | null>(null);
+  const [tocOpen, setTocOpen] = useState(false);
+  const lessonTheme = getLessonTheme(settings.lessonTheme);
+
+  // The app scrolls inside <main>, not window — resolve it from the iframe.
+  const getScrollContainer = useCallback(
+    () => frameRef.current?.closest('main') ?? null,
+    [],
+  );
+
+  // Heading position (px) inside the scroll container's content, or null.
+  const headingTop = useCallback((id: string): number | null => {
+    const iframe = frameRef.current;
+    const container = getScrollContainer();
+    const el = iframe?.contentDocument?.getElementById(id);
+    if (!iframe || !container || !el) return null;
+    // The iframe is sized to its full content height (no internal scroll), so a
+    // heading's viewport position = iframe rect + element rect within the frame.
+    return iframe.getBoundingClientRect().top + el.getBoundingClientRect().top
+      - container.getBoundingClientRect().top + container.scrollTop;
+  }, [getScrollContainer]);
+
+  const scrollToHeading = useCallback((id: string) => {
+    const container = getScrollContainer();
+    const top = headingTop(id);
+    if (!container || top == null) return;
+    setActiveToc(id);
+    container.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' });
+  }, [getScrollContainer, headingTop]);
+
+  // Scroll-spy: highlight the last heading that has reached the reading line.
+  useEffect(() => {
+    if (tab !== 'lesson' || toc.length === 0) return;
+    let raf = 0;
+    const update = () => {
+      let current: string | null = toc[0]?.id ?? null;
+      for (const item of toc) {
+        const top = headingTop(item.id);
+        if (top == null) break;
+        const container = getScrollContainer();
+        if (!container) break;
+        if (top - container.scrollTop <= 110) current = item.id;
+        else break;
+      }
+      setActiveToc(current);
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+    const container = getScrollContainer();
+    container?.addEventListener('scroll', onScroll, { passive: true });
+    // Headings only get ids once the iframe content settles — measure shortly
+    // after mount and again later to cover font/image reflow.
+    const t1 = setTimeout(update, 150);
+    const t2 = setTimeout(update, 600);
+    return () => {
+      container?.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [tab, toc, headingTop, getScrollContainer]);
 
   useEffect(() => {
     if (lessonId) load();
@@ -57,7 +130,10 @@ export function LessonDetailPage() {
   const handleRegenerate = async () => {
     if (!lesson || !workspaceId || !settings.apiKey || busy) return;
     setBusy(true);
-    setBusyStatus(t('genPreparing'));
+    setRegenPhase('preparing');
+    setRegenStream('');
+    setRegenError('');
+    setRegenStartedAt(Date.now());
     const guidance = regenText.trim() || undefined;
     const oldNumber = lesson.number;
     try {
@@ -66,28 +142,31 @@ export function LessonDetailPage() {
         targetItem: linkedItem || undefined,
         userRequest: guidance,
         reuseNumber: oldNumber,
-        onChunk: (chunk) => setBusyStatus(prev => prev.length > 80 ? t('genGenerating') : prev + chunk.slice(0, 30)),
+        onChunk: (chunk) => {
+          setRegenPhase('streaming');
+          setRegenStream(prev => (prev + chunk).slice(-6000));
+        },
       });
       setRegenOpen(false);
       setRegenText('');
       navigate(`/workspace/${workspaceId}/lesson/${newLesson.id}`, { replace: true });
     } catch (err: any) {
-      setBusyStatus(`${t('error')}: ${err.message}`);
+      setRegenError(err.message);
+      setRegenPhase('error');
     } finally {
       setBusy(false);
     }
   };
 
-  const handleQuizAnswer = (_quizId: string, correct: boolean) => {
-    setQuizResults(prev => {
-      const next = {
-        correct: prev.correct + (correct ? 1 : 0),
-        total: prev.total + 1,
-      };
-      if (lessonId) {
-        db.lessons.update(lessonId, { quizCorrect: next.correct, quizTotal: next.total });
-      }
-      return next;
+  // Quiz feedback lives entirely inside the document (option styling + feedback
+  // block). Here we only persist progress silently — the lessons list shows it.
+  const handleQuizAnswer = async (_quizId: string, correct: boolean) => {
+    if (!lessonId) return;
+    const l = await db.lessons.get(lessonId);
+    if (!l) return;
+    await db.lessons.update(lessonId, {
+      quizCorrect: (l.quizCorrect ?? 0) + (correct ? 1 : 0),
+      quizTotal: (l.quizTotal ?? 0) + 1,
     });
   };
 
@@ -130,7 +209,7 @@ export function LessonDetailPage() {
   ];
 
   return (
-    <div className="fade-in max-w-3xl">
+    <div className="fade-in">
       <div className="mb-4">
         <Link
           to={`/workspace/${workspaceId}/lessons`}
@@ -201,8 +280,18 @@ export function LessonDetailPage() {
             >
               {t('cancel')}
             </button>
-            {busyStatus && <span className="text-xs text-[var(--color-text-muted)] font-mono truncate">{busyStatus}</span>}
           </div>
+          {regenPhase && (
+            <div className="mt-3">
+              <ThinkingBox
+                phase={regenPhase}
+                title={t('thinkingLesson')}
+                content={regenStream}
+                errorText={regenError}
+                startedAt={regenStartedAt}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -231,17 +320,6 @@ export function LessonDetailPage() {
       {/* Lesson tab */}
       {tab === 'lesson' && (
         <>
-          {quizResults.total > 0 && (
-            <div className="mb-4 p-3 rounded-lg bg-[var(--color-accent-light)] border border-[var(--color-accent-border)]">
-              <p className="text-sm font-medium text-[var(--color-text-heading)]">
-                {t('quizProgress')}: {quizResults.correct}/{quizResults.total} {t('correct')}
-                <span className="ml-2 text-[var(--color-text-muted)]">
-                  ({Math.round((quizResults.correct / quizResults.total) * 100)}%)
-                </span>
-              </p>
-            </div>
-          )}
-
           {lesson.primarySource && (
             <div className="mb-4 p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)]">
               <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold mb-0.5">
@@ -258,8 +336,41 @@ export function LessonDetailPage() {
             </div>
           )}
 
-          <div className="rounded-xl overflow-hidden border border-[var(--color-border)] shadow-sm">
-            <LessonRenderer htmlContent={lesson.htmlContent} onQuizAnswer={handleQuizAnswer} />
+          {/* TOC (mobile): collapsible panel above the lesson */}
+          {toc.length > 1 && (
+            <div className="lg:hidden mb-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTocOpen(o => !o)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-[var(--color-text-heading)]"
+              >
+                <span>{t('tocTitle')}</span>
+                <svg viewBox="0 0 12 12" fill="none" className={`h-3.5 w-3.5 text-[var(--color-text-muted)] transition-transform duration-200 ${tocOpen ? 'rotate-180' : ''}`}>
+                  <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {tocOpen && (
+                <div className="border-t border-[var(--color-border)] px-2 py-2 max-h-64 overflow-y-auto">
+                  <LessonToc items={toc} activeId={activeToc} onSelect={(id) => { scrollToHeading(id); setTocOpen(false); }} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-6 items-start">
+            <div className="flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--color-border)] shadow-sm">
+              <LessonRenderer htmlContent={lesson.htmlContent} onQuizAnswer={handleQuizAnswer} frameRef={frameRef} theme={lessonTheme} />
+            </div>
+
+            {/* TOC (desktop): sticky right rail with scroll-spy */}
+            {toc.length > 1 && (
+              <aside className="hidden lg:block w-64 shrink-0 sticky top-6 max-h-[calc(100vh-4rem)] overflow-y-auto py-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] mb-2 pl-3">
+                  {t('tocTitle')}
+                </p>
+                <LessonToc items={toc} activeId={activeToc} onSelect={scrollToHeading} />
+              </aside>
+            )}
           </div>
 
           <div className="mt-6">
@@ -282,7 +393,7 @@ export function LessonDetailPage() {
               </button>
             </div>
             <div ref={refWrapperRef} className="rounded-xl overflow-hidden border border-[var(--color-border)] shadow-sm">
-              <LessonRenderer htmlContent={reference.htmlContent} />
+              <LessonRenderer htmlContent={reference.htmlContent} theme={lessonTheme} />
             </div>
           </div>
         ) : (

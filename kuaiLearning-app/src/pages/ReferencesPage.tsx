@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { LessonRenderer } from '../components/LessonRenderer';
 import { useTranslation } from '../i18n/useTranslation';
+import { useSettingsStore } from '../stores/useSettingsStore';
+import { getLessonTheme } from '../lib/lessonThemes';
 import type { Reference } from '../types';
 import { db } from '../db';
 
@@ -11,6 +13,7 @@ export function ReferencesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRef, setSelectedRef] = useState<Reference | null>(null);
   const { t } = useTranslation();
+  const lessonTheme = useSettingsStore(s => getLessonTheme(s.settings.lessonTheme));
   const rendererWrapperRef = useRef<HTMLDivElement>(null);
 
 
@@ -42,7 +45,7 @@ export function ReferencesPage() {
 
   if (selectedRef) {
     return (
-      <div className="fade-in max-w-3xl">
+      <div className="fade-in max-w-4xl">
         <button
           onClick={() => setSelectedRef(null)}
           className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors inline-flex items-center gap-1 mb-3"
@@ -73,7 +76,7 @@ export function ReferencesPage() {
         </div>
 
         <div ref={rendererWrapperRef} className="rounded-xl overflow-hidden border border-[var(--color-border)] shadow-sm">
-          <LessonRenderer htmlContent={selectedRef.htmlContent} />
+          <LessonRenderer htmlContent={selectedRef.htmlContent} theme={lessonTheme} />
         </div>
       </div>
     );

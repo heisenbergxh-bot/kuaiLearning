@@ -1,12 +1,16 @@
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTranslation } from '../i18n/useTranslation';
+import { LESSON_THEMES, DEFAULT_LESSON_THEME_ID } from '../lib/lessonThemes';
 
 export function SettingsPage() {
-  const { settings, setApiKey, setCustomBaseUrl, setModel, setLanguage } = useSettingsStore();
-  const { t } = useTranslation();
+  const { settings, setApiKey, setCustomBaseUrl, setModel, setLanguage, setLessonTheme } = useSettingsStore();
+  const { t, lang } = useTranslation();
+  const activeThemeId = settings.lessonTheme ?? DEFAULT_LESSON_THEME_ID;
+
+  const fontTag = { serif: t('themeFontSerif'), sans: t('themeFontSans'), kai: t('themeFontKai') } as const;
 
   return (
-    <div className="fade-in max-w-lg">
+    <div className="fade-in max-w-2xl">
       <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('settingsTitle')}</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-6">{t('settingsDesc')}</p>
 
@@ -37,6 +41,50 @@ export function SettingsPage() {
             >
               English
             </button>
+          </div>
+        </div>
+
+        {/* Lesson document theme */}
+        <div>
+          <label className="block text-sm font-semibold text-[var(--color-text-heading)] mb-1">
+            {t('themeLabel')}
+          </label>
+          <p className="text-xs text-[var(--color-text-muted)] mb-2.5">{t('themeHint')}</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+            {LESSON_THEMES.map(theme => {
+              const active = theme.id === activeThemeId;
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => setLessonTheme(theme.id)}
+                  className={`text-left rounded-lg border p-1.5 transition-all ${
+                    active
+                      ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/30'
+                      : 'border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-accent-border)]'
+                  }`}
+                >
+                  {/* Mini document preview drawn with the theme's own palette */}
+                  <div
+                    className="h-14 rounded-md border p-2 flex flex-col justify-center gap-1.5"
+                    style={{ background: theme.vars.bg, borderColor: theme.vars.border }}
+                  >
+                    <div className="h-1.5 w-3/5 rounded-full" style={{ background: theme.vars.textHeading }} />
+                    <div className="h-1 w-4/5 rounded-full" style={{ background: theme.vars.textMuted }} />
+                    <div className="h-1 w-2/3 rounded-full" style={{ background: theme.vars.textMuted, opacity: 0.6 }} />
+                    <div className="h-1.5 w-1/4 rounded-full" style={{ background: theme.vars.accent }} />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 px-0.5">
+                    <span className={`text-xs font-medium truncate ${active ? 'text-[var(--color-accent)]' : 'text-[var(--color-text)]'}`}>
+                      {theme.name[lang]}
+                    </span>
+                    <span className="text-[10px] text-[var(--color-text-muted)] shrink-0 ml-1">
+                      {fontTag[theme.font]}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

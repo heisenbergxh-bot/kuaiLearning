@@ -6,6 +6,7 @@ import { useTranslation } from '../i18n/useTranslation';
 import { generateSyllabus } from '../ai/client';
 import { generateAndSaveLesson } from '../lib/lessonGen';
 import { SyllabusRoadmap } from '../components/SyllabusRoadmap';
+import { ThinkingBox, type ThinkingPhase } from '../components/ThinkingBox';
 import type { Lesson, SyllabusItem } from '../types';
 import { db, generateId } from '../db';
 
@@ -21,7 +22,11 @@ export function LessonsPage() {
   const [syllabus, setSyllabus] = useState<SyllabusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [genStatus, setGenStatus] = useState('');
+  const [genPhase, setGenPhase] = useState<ThinkingPhase | null>(null);
+  const [genLabel, setGenLabel] = useState('');
+  const [genStream, setGenStream] = useState('');
+  const [genError, setGenError] = useState('');
+  const [genStartedAt, setGenStartedAt] = useState<number | null>(null);
 
 
   const loadLessons = useCallback(async () => {
@@ -46,7 +51,11 @@ export function LessonsPage() {
   const handleGenerateSyllabus = async (mode: 'full' | 'replan', guidance?: string) => {
     if (!workspaceId || !settings.apiKey || generating) return;
     setGenerating(true);
-    setGenStatus(t('generatingSyllabus'));
+    setGenPhase('preparing');
+    setGenLabel(t('thinkingSyllabus'));
+    setGenStream('');
+    setGenError('');
+    setGenStartedAt(Date.now());
     try {
       const items = await generateSyllabus(settings, workspaceId, mode, guidance);
       const now = Date.now();
@@ -82,10 +91,11 @@ export function LessonsPage() {
         });
       }
       await loadSyllabus();
-      setGenStatus(t('genDone'));
-      setTimeout(() => setGenStatus(''), 2000);
+      setGenPhase('done');
+      setTimeout(() => setGenPhase(null), 2500);
     } catch (err: any) {
-      setGenStatus(`${t('error')}: ${err.message}`);
+      setGenError(err.message);
+      setGenPhase('error');
     } finally {
       setGenerating(false);
     }
@@ -94,20 +104,27 @@ export function LessonsPage() {
   const handleGenerate = async (targetItem?: SyllabusItem) => {
     if (!workspaceId || !settings.apiKey || generating) return;
     setGenerating(true);
-    setGenStatus(t('genPreparing'));
+    setGenPhase('preparing');
+    setGenLabel(t('thinkingLesson'));
+    setGenStream('');
+    setGenError('');
+    setGenStartedAt(Date.now());
     try {
       await generateAndSaveLesson(settings, workspaceId, {
         targetItem,
         onChunk: (chunk) => {
-          setGenStatus(prev => prev.length > 80 ? t('genGenerating') : prev + chunk.slice(0, 30));
+          setGenPhase(p => (p === 'streaming' ? p : 'streaming'));
+          // Keep only the tail so long generations don't grow state unbounded.
+          setGenStream(prev => (prev + chunk).slice(-6000));
         },
       });
       await loadLessons();
       await loadSyllabus();
-      setGenStatus(t('genDone'));
-      setTimeout(() => setGenStatus(''), 2000);
+      setGenPhase('done');
+      setTimeout(() => setGenPhase(null), 2500);
     } catch (err: any) {
-      setGenStatus(`${t('error')}: ${err.message}`);
+      setGenError(err.message);
+      setGenPhase('error');
     } finally {
       setGenerating(false);
     }
@@ -143,13 +160,19 @@ export function LessonsPage() {
         onOpenLesson={(lessonId, tab) => navigate(`/workspace/${workspaceId}/lesson/${lessonId}?tab=${tab}`)}
       />
 
-      {(genStatus || !settings.apiKey) && (
+      {(genPhase || !settings.apiKey) && (
         <div className="mb-8 -mt-2">
           {!settings.apiKey && (
             <p className="text-xs text-[var(--color-warning)]">{t('genNoApiKey')}</p>
           )}
-          {genStatus && (
-            <p className="text-xs text-[var(--color-text-muted)] mt-1 font-mono truncate">{genStatus}</p>
+          {genPhase && (
+            <ThinkingBox
+              phase={genPhase}
+              title={genLabel}
+              content={genStream}
+              errorText={genError}
+              startedAt={genStartedAt}
+            />
           )}
         </div>
       )}
