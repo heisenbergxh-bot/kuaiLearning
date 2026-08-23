@@ -113,6 +113,8 @@ IndexedDB/localStorage 中。
 - Alembic 已升级到 `20260821_0002 (head)`。
 - Nginx、API、MySQL、Casdoor 服务及外网健康检查均已验证正常。
 - Casdoor 已登记 8081 回调；授权入口返回正常页面，未拒绝 redirect URI。
+- 已从服务日志确认真实用户完成 callback、`/me` 返回 200 以及 logout，基础登录闭环已跑通。
+- 当前测试环境前后端版本为 Git 提交 `6144572`，数据库为 `20260823_0003 (head)`。
 
 注意：测试服务器的密钥、数据库密码和 Casdoor Client Secret 不进入 Git，保存在服务器
 受限环境文件中。当前是 HTTP 测试环境，正式使用前应切换域名和 HTTPS，并设置
@@ -147,8 +149,8 @@ IndexedDB/localStorage 中。
 
 ### P0：先把现有学习体验真正接到后端
 
-1. **完成真实登录回归**：使用一个有效 Casdoor 用户走完登录 → callback → `/me` → logout，
-   检查 Session 创建、过期和再次登录。当前只验证到了授权页及回调配置。
+1. **完善登录自动化回归**：真实用户的登录 → callback → `/me` → logout 已经跑通；下一步补
+   可重复的测试用例，覆盖 Session 过期、吊销和再次登录。
 2. **继续扩展 API 契约**：工作区契约已经落地；下一步为大纲、课程、测验、术语、参考文档
    和学习记录建立 Pydantic Schema 与 TypeScript API Client。
 3. **继续渐进迁移本地数据**：工作区元数据已经同步；保留 IndexedDB 作为临时缓存，按领域
