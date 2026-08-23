@@ -1,7 +1,9 @@
 import type { Lesson, Settings, SyllabusItem } from '../types';
 import { generateLessonStream } from '../ai/client';
 import { extractQuizzes } from './extractQuizzes';
-import { db, generateId } from '../db';
+import { db, deleteLocalLessonData, generateId } from '../db';
+import { deleteRemoteLesson } from '../api/learningContent';
+import { pushLocalLesson, pushLocalSyllabusItem } from '../api/learningContentSync';
 
 interface GenerateOpts {
   targetItem?: SyllabusItem;
@@ -30,7 +32,7 @@ export async function generateAndSaveLesson(
   );
 
   const now = Date.now();
-  return db.transaction('rw', [
+  const lesson = await db.transaction('rw', [
     db.lessons, db.syllabusItems, db.quizQuestions, db.glossaryTerms,
     db.learningRecords, db.references, db.resources,
   ], async () => {
@@ -54,7 +56,11 @@ export async function generateAndSaveLesson(
   await db.lessons.add(lesson);
 
   if (targetItem) {
-    await db.syllabusItems.update(targetItem.id, { status: 'generated', lessonId: lesson.id });
+    await db.syllabusItems.update(targetItem.id, {
+      status: 'generated',
+      lessonId: lesson.id,
+      updatedAt: now,
+    });
   }
 
   // Quiz bank
@@ -141,20 +147,26 @@ export async function generateAndSaveLesson(
 
   return lesson;
   });
+
+  try {
+    const synchronizedLesson = await pushLocalLesson(lesson);
+    if (targetItem) {
+      const synchronizedItem = await db.syllabusItems.get(targetItem.id);
+      if (synchronizedItem) await pushLocalSyllabusItem(synchronizedItem);
+    }
+    return synchronizedLesson;
+  } catch (reason) {
+    console.warn('Generated lesson remains local and will be synchronized later.', reason);
+    return lesson;
+  }
 }
 
 // Delete a lesson and all data derived from it. Does NOT touch the linked
 // syllabus item (caller decides) nor resources (sources may be shared).
 export async function deleteLessonCascade(lessonId: string): Promise<void> {
-  await db.quizQuestions.where('lessonId').equals(lessonId).delete();
-  await db.references.where('sourceLessonId').equals(lessonId).delete();
-  await db.chatMessages.where('lessonId').equals(lessonId).delete();
-
-  const terms = await db.glossaryTerms.filter(g => g.sourceLessonId === lessonId).primaryKeys();
-  if (terms.length) await db.glossaryTerms.bulkDelete(terms as string[]);
-
-  const records = await db.learningRecords.filter(r => r.sourceLessonId === lessonId).primaryKeys();
-  if (records.length) await db.learningRecords.bulkDelete(records as string[]);
-
-  await db.lessons.delete(lessonId);
+  const lesson = await db.lessons.get(lessonId);
+  if (lesson) {
+    await deleteRemoteLesson(lesson.workspaceId, lesson.id);
+  }
+  await deleteLocalLessonData(lessonId);
 }

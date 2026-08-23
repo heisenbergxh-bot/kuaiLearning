@@ -10,6 +10,7 @@ from app.models.entities import (
     Lesson,
     PracticeSubmission,
     PracticeTask,
+    SyllabusItem,
 )
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "LearningEvidenceEvent",
     "LearningWorkspace",
     "Lesson",
+    "SyllabusItem",
     "PracticeSubmission",
     "PracticeTask",
 ]

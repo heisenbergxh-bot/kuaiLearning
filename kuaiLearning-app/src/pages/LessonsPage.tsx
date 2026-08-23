@@ -8,6 +8,8 @@ import { generateAndSaveLesson } from '../lib/lessonGen';
 import { SyllabusRoadmap } from '../components/SyllabusRoadmap';
 import type { Lesson, SyllabusItem } from '../types';
 import { db, generateId } from '../db';
+import { deleteRemoteSyllabusItem } from '../api/learningContent';
+import { synchronizeLearningContent } from '../api/learningContentSync';
 
 export function LessonsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -38,8 +40,12 @@ export function LessonsPage() {
 
   useEffect(() => {
     if (workspaceId) {
-      void loadLessons();
-      void loadSyllabus();
+      void synchronizeLearningContent(workspaceId)
+        .catch(reason => console.warn('Learning content sync failed.', reason))
+        .finally(() => {
+          void loadLessons();
+          void loadSyllabus();
+        });
     }
   }, [workspaceId, loadLessons, loadSyllabus]);
 
@@ -57,13 +63,19 @@ export function LessonsPage() {
         // drop only the not-yet-generated planned items.
         kept = syllabus.filter(s => s.lessonId).sort((a, b) => a.order - b.order);
         const drop = syllabus.filter(s => !s.lessonId).map(s => s.id);
+        await Promise.all(drop.map(id => deleteRemoteSyllabusItem(workspaceId, id)));
         if (drop.length) await db.syllabusItems.bulkDelete(drop);
         // Compact kept orders to 1..k so deleted planned items leave no gaps.
         for (let i = 0; i < kept.length; i++) {
-          if (kept[i].order !== i + 1) await db.syllabusItems.update(kept[i].id, { order: i + 1 });
+          if (kept[i].order !== i + 1) {
+            await db.syllabusItems.update(kept[i].id, { order: i + 1, updatedAt: now });
+          }
         }
       } else {
         // Fresh plan — replace everything.
+        await Promise.all(
+          syllabus.map(item => deleteRemoteSyllabusItem(workspaceId, item.id)),
+        );
         await db.syllabusItems.where('workspaceId').equals(workspaceId).delete();
       }
 
@@ -79,8 +91,10 @@ export function LessonsPage() {
           description: it.description,
           status: 'planned',
           createdAt: now,
+          updatedAt: now,
         });
       }
+      await synchronizeLearningContent(workspaceId);
       await loadSyllabus();
       setGenStatus(t('genDone'));
       setTimeout(() => setGenStatus(''), 2000);

@@ -63,8 +63,16 @@ Casdoor 管理员必须把 `CASDOOR_REDIRECT_URI` 原样登记到 Application。
 - `DELETE /api/v1/workspaces/{id}`：写入删除墓碑，防止其他浏览器重新上传旧副本。
 
 `content_payload` 保存 KuaiLearning 前端拥有的使命与笔记；`context_snapshot` 保留给外部
-岗位/人才系统，浏览器同步接口不会覆盖该字段。当前只同步工作区元数据，课程、题库、
-术语和参考资料仍在 IndexedDB，后续按领域逐步迁移。
+岗位/人才系统，浏览器同步接口不会覆盖该字段。
+
+学习内容同步接口：
+
+- `GET/PUT/DELETE /api/v1/workspaces/{workspace_id}/lessons[...]`：课程正文与学习进度。
+- `GET/PUT/DELETE /api/v1/workspaces/{workspace_id}/syllabus[...]`：学习大纲及课程关联。
+
+课程正文保存在 `lessons.content_payload`；大纲使用独立 `syllabus_items` 表。所有接口先
+校验工作区所有权，前端已有 UUID 可直接幂等写入。当前题库明细、术语、参考文档和
+学习记录仍只在 IndexedDB 中。
 
 HTTP 环境必须保持 `COOKIE_SECURE=false`；迁移 HTTPS 后应改为 `true`。Cookie 写接口
 要求浏览器 `Origin` 与 `PUBLIC_BASE_URL` 完全一致。

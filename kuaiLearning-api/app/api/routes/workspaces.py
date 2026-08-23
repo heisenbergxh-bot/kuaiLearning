@@ -42,7 +42,7 @@ async def upsert_workspace(
     session: DbSession,
 ) -> LearningWorkspace:
     if not workspace_id or len(workspace_id) > 36:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid ID")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid ID")
 
     workspace = await session.scalar(
         select(LearningWorkspace).where(LearningWorkspace.id == workspace_id)

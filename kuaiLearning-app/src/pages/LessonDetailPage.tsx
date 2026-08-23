@@ -8,6 +8,7 @@ import { useSettingsStore } from '../stores/useSettingsStore';
 import { generateAndSaveLesson, deleteLessonCascade } from '../lib/lessonGen';
 import type { Lesson, Reference, GlossaryTerm, SyllabusItem } from '../types';
 import { db } from '../db';
+import { updateLocalLessonAndSync } from '../api/learningContentSync';
 
 type Tab = 'lesson' | 'reference' | 'glossary';
 
@@ -49,7 +50,8 @@ export function LessonDetailPage() {
       setTerms(allTerms.filter(gt => gt.sourceLessonId === result.id));
       const items = await db.syllabusItems.where('workspaceId').equals(result.workspaceId).toArray();
       setLinkedItem(items.find(s => s.lessonId === result.id) || null);
-      await db.lessons.update(result.id, { lastViewedAt: Date.now() });
+      const updated = await updateLocalLessonAndSync(result.id, { lastViewedAt: Date.now() });
+      if (updated) setLesson(updated);
     }
     setLoading(false);
   };
@@ -85,7 +87,10 @@ export function LessonDetailPage() {
         total: prev.total + 1,
       };
       if (lessonId) {
-        db.lessons.update(lessonId, { quizCorrect: next.correct, quizTotal: next.total });
+        void updateLocalLessonAndSync(lessonId, {
+          quizCorrect: next.correct,
+          quizTotal: next.total,
+        });
       }
       return next;
     });
@@ -94,8 +99,8 @@ export function LessonDetailPage() {
   const handleMarkComplete = async () => {
     if (!lesson) return;
     const completedAt = Date.now();
-    await db.lessons.update(lesson.id, { completedAt });
-    setLesson({ ...lesson, completedAt });
+    const updated = await updateLocalLessonAndSync(lesson.id, { completedAt });
+    setLesson(updated || { ...lesson, completedAt });
   };
 
   const handlePrintReference = () => {

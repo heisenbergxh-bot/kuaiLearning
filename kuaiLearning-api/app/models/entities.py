@@ -88,6 +88,28 @@ class Lesson(IdMixin, TimestampMixin, Base):
     order_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
+    client_updated_at_ms: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class SyllabusItem(IdMixin, TimestampMixin, Base):
+    __tablename__ = "syllabus_items"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "order_index", name="uq_syllabus_workspace_order"),
+        UniqueConstraint("lesson_id", name="uq_syllabus_lesson"),
+    )
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("learning_workspaces.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    module_title: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="planned", nullable=False)
+    lesson_id: Mapped[str | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL"), index=True
+    )
+    client_updated_at_ms: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class DiagnosticSession(IdMixin, TimestampMixin, Base):

@@ -27,6 +27,7 @@ export interface Lesson {
   primarySource?: { title: string; url: string };
   createdAt: number;
   updatedAt: number;
+  serverSyncedAt?: number;
   // Progress
   completedAt?: number;
   quizCorrect?: number;
@@ -90,6 +91,8 @@ export interface SyllabusItem {
   status: 'planned' | 'generated'; // 'completed' is derived from the linked lesson's completedAt
   lessonId?: string;    // set once a lesson has been generated for this item
   createdAt: number;
+  updatedAt?: number;
+  serverSyncedAt?: number;
 }
 
 export interface QuizQuestion {

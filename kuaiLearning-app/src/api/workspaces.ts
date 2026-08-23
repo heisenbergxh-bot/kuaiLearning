@@ -1,15 +1,5 @@
 import type { Mission, Workspace } from '../types';
-import { redirectToLogin } from '../auth/navigation';
-
-export class ApiError extends Error {
-  readonly status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-  }
-}
+import { requestJson, requestNoContent } from './http';
 
 interface RemoteMission {
   topic: string;
@@ -67,30 +57,6 @@ function toWorkspaceWrite(workspace: Workspace): WorkspaceWrite {
   };
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!response.ok) {
-    if (response.status === 401) redirectToLogin();
-    let detail = `请求失败（${response.status}）`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload.detail) detail = payload.detail;
-    } catch {
-      // Keep the status-based fallback when an upstream returns non-JSON.
-    }
-    throw new ApiError(detail, response.status);
-  }
-  return (await response.json()) as T;
-}
-
 export async function listRemoteWorkspaces(): Promise<RemoteWorkspace[]> {
   const pageSize = 100;
   const result: RemoteWorkspace[] = [];
@@ -131,12 +97,7 @@ export async function upsertRemoteWorkspace(workspace: Workspace): Promise<Remot
 }
 
 export async function deleteRemoteWorkspace(id: string): Promise<void> {
-  const response = await fetch(`/api/v1/workspaces/${encodeURIComponent(id)}`, {
+  await requestNoContent(`/api/v1/workspaces/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
   });
-  if (response.status === 404) return;
-  if (response.status === 401) redirectToLogin();
-  if (!response.ok) throw new ApiError(`删除失败（${response.status}）`, response.status);
 }
