@@ -125,7 +125,7 @@ IndexedDB/localStorage 中。
 - Nginx、API、MySQL、Casdoor 服务及外网健康检查均已验证正常。
 - Casdoor 已登记 8081 回调；授权入口返回正常页面，未拒绝 redirect URI。
 - 已从服务日志确认真实用户完成 callback、`/me` 返回 200 以及 logout，基础登录闭环已跑通。
-- 当前测试环境前后端版本为 Git 提交 `6144572`，数据库为 `20260823_0003 (head)`。
+- 当前测试环境前后端版本为 Git 提交 `7174d99`，数据库为 `20260823_0004 (head)`。
 
 注意：测试服务器的密钥、数据库密码和 Casdoor Client Secret 不进入 Git，保存在服务器
 受限环境文件中。当前是 HTTP 测试环境，正式使用前应切换域名和 HTTPS，并设置
