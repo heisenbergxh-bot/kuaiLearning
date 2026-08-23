@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     DateTime,
     ForeignKey,
     Index,
@@ -26,6 +27,8 @@ class LearningWorkspace(IdMixin, TimestampMixin, Base):
     learning_goal: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
     context_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    content_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    client_updated_at_ms: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class AuthIdentity(IdMixin, TimestampMixin, Base):

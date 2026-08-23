@@ -35,6 +35,8 @@ export const translations = {
   deleteWorkspaceConfirm: { zh: '确定删除"{name}"及其所有课程、记录和术语表？此操作不可撤销。', en: 'Delete "{name}" and all its lessons, records, and glossary? This cannot be undone.' },
   deleteWorkspaceTitle: { zh: '删除工作区', en: 'Delete workspace' },
   workspaceNamePlaceholder: { zh: '工作区名称（如"学 Rust"）：', en: 'Workspace name (e.g. "Learn Rust"):' },
+  workspaceSyncFailed: { zh: '⚠ 云端同步失败，点击重试', en: '⚠ Cloud sync failed. Click to retry.' },
+  workspaceDeleteFailed: { zh: '云端删除失败，请稍后重试', en: 'Cloud deletion failed. Try again later.' },
 
   // Mission Page
   missionTitle: { zh: '目标', en: 'Mission' },

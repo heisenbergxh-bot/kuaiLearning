@@ -69,3 +69,34 @@ export class KuaiLearningDB extends Dexie {
 }
 
 export const db = new KuaiLearningDB();
+
+export async function deleteLocalWorkspaceData(id: string): Promise<void> {
+  const lessonIds = (await db.lessons.where('workspaceId').equals(id).primaryKeys()) as string[];
+  await db.transaction(
+    'rw',
+    [
+      db.workspaces,
+      db.lessons,
+      db.learningRecords,
+      db.glossaryTerms,
+      db.resources,
+      db.references,
+      db.quizQuestions,
+      db.syllabusItems,
+      db.chatMessages,
+    ],
+    async () => {
+      await db.workspaces.delete(id);
+      await db.lessons.where('workspaceId').equals(id).delete();
+      await db.learningRecords.where('workspaceId').equals(id).delete();
+      await db.glossaryTerms.where('workspaceId').equals(id).delete();
+      await db.resources.where('workspaceId').equals(id).delete();
+      await db.references.where('workspaceId').equals(id).delete();
+      await db.quizQuestions.where('workspaceId').equals(id).delete();
+      await db.syllabusItems.where('workspaceId').equals(id).delete();
+      if (lessonIds.length > 0) {
+        await db.chatMessages.where('lessonId').anyOf(lessonIds).delete();
+      }
+    },
+  );
+}

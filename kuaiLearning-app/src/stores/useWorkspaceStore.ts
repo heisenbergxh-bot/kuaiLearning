@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import type { Workspace } from '../types';
-import { db, generateId } from '../db';
+import { db, deleteLocalWorkspaceData, generateId } from '../db';
+import { deleteRemoteWorkspace, upsertRemoteWorkspace } from '../api/workspaces';
+import { synchronizeWorkspaceCache } from '../api/workspaceSync';
 
 interface WorkspaceState {
   workspaces: Workspace[];
   activeId: string | null;
   loading: boolean;
+  syncError: string | null;
 
   loadWorkspaces: () => Promise<void>;
   createWorkspace: (name: string) => Promise<Workspace>;
@@ -19,12 +22,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeId: null,
   loading: false,
+  syncError: null,
 
   loadWorkspaces: async () => {
     set({ loading: true });
-    const workspaces = await db.workspaces.orderBy('updatedAt').reverse().toArray();
-    const activeId = get().activeId || workspaces[0]?.id || null;
-    set({ workspaces, activeId, loading: false });
+    const localWorkspaces = await db.workspaces.orderBy('updatedAt').reverse().toArray();
+    set({
+      workspaces: localWorkspaces,
+      activeId: get().activeId || localWorkspaces[0]?.id || null,
+    });
+    try {
+      const workspaces = await synchronizeWorkspaceCache(localWorkspaces);
+      const previousActiveId = get().activeId;
+      const activeId = workspaces.some(item => item.id === previousActiveId)
+        ? previousActiveId
+        : workspaces[0]?.id || null;
+      set({ workspaces, activeId, loading: false, syncError: null });
+    } catch (reason) {
+      set({ loading: false, syncError: syncErrorMessage(reason) });
+    }
   },
 
   createWorkspace: async (name: string) => {
@@ -40,41 +56,63 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     await db.workspaces.add(ws);
     const workspaces = [...get().workspaces, ws];
     set({ workspaces, activeId: ws.id });
+    try {
+      await upsertRemoteWorkspace(ws);
+      set({ syncError: null });
+    } catch (reason) {
+      set({ syncError: syncErrorMessage(reason) });
+    }
     return ws;
   },
 
   deleteWorkspace: async (id: string) => {
-    // Collect lesson ids first so we can clean up lesson-scoped tables.
-    const lessonIds = (await db.lessons.where('workspaceId').equals(id).primaryKeys()) as string[];
-
-    await db.workspaces.delete(id);
-    await db.lessons.where('workspaceId').equals(id).delete();
-    await db.learningRecords.where('workspaceId').equals(id).delete();
-    await db.glossaryTerms.where('workspaceId').equals(id).delete();
-    await db.resources.where('workspaceId').equals(id).delete();
-    await db.references.where('workspaceId').equals(id).delete();
-    await db.quizQuestions.where('workspaceId').equals(id).delete();
-    await db.syllabusItems.where('workspaceId').equals(id).delete();
-    if (lessonIds.length > 0) {
-      await db.chatMessages.where('lessonId').anyOf(lessonIds).delete();
+    try {
+      await deleteRemoteWorkspace(id);
+    } catch (reason) {
+      set({ syncError: syncErrorMessage(reason) });
+      throw reason;
     }
+
+    await deleteLocalWorkspaceData(id);
 
     const workspaces = get().workspaces.filter(w => w.id !== id);
     const activeId = get().activeId === id ? (workspaces[0]?.id || null) : get().activeId;
-    set({ workspaces, activeId });
+    set({ workspaces, activeId, syncError: null });
   },
 
   setActive: (id: string) => set({ activeId: id }),
 
   updateMission: async (id: string, mission: Workspace['mission']) => {
-    await db.workspaces.update(id, { mission, updatedAt: Date.now() });
-    const workspaces = get().workspaces.map(w => w.id === id ? { ...w, mission, updatedAt: Date.now() } : w);
+    const updatedAt = Date.now();
+    await db.workspaces.update(id, { mission, updatedAt });
+    const workspaces = get().workspaces.map(w => w.id === id ? { ...w, mission, updatedAt } : w);
     set({ workspaces });
+    const workspace = workspaces.find(item => item.id === id);
+    if (!workspace) return;
+    try {
+      await upsertRemoteWorkspace(workspace);
+      set({ syncError: null });
+    } catch (reason) {
+      set({ syncError: syncErrorMessage(reason) });
+    }
   },
 
   updateNotes: async (id: string, notes: string) => {
-    await db.workspaces.update(id, { notes, updatedAt: Date.now() });
-    const workspaces = get().workspaces.map(w => w.id === id ? { ...w, notes, updatedAt: Date.now() } : w);
+    const updatedAt = Date.now();
+    await db.workspaces.update(id, { notes, updatedAt });
+    const workspaces = get().workspaces.map(w => w.id === id ? { ...w, notes, updatedAt } : w);
     set({ workspaces });
+    const workspace = workspaces.find(item => item.id === id);
+    if (!workspace) return;
+    try {
+      await upsertRemoteWorkspace(workspace);
+      set({ syncError: null });
+    } catch (reason) {
+      set({ syncError: syncErrorMessage(reason) });
+    }
   },
 }));
+
+function syncErrorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : '工作区同步失败';
+}

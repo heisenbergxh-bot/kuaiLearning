@@ -7,7 +7,7 @@ import type { Workspace } from '../types';
 import { useAuth } from '../auth/authContext';
 
 function WorkspaceSwitcher() {
-  const { workspaces, activeId, setActive, deleteWorkspace } = useWorkspaceStore();
+  const { workspaces, activeId, syncError, setActive, deleteWorkspace, loadWorkspaces } = useWorkspaceStore();
   const { t } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -15,7 +15,11 @@ function WorkspaceSwitcher() {
 
   const handleDelete = async (ws: Workspace) => {
     if (confirm(t('deleteWorkspaceConfirm', { name: ws.name }))) {
-      await deleteWorkspace(ws.id);
+      try {
+        await deleteWorkspace(ws.id);
+      } catch (reason) {
+        alert(reason instanceof Error ? reason.message : t('workspaceDeleteFailed'));
+      }
     }
   };
 
@@ -58,6 +62,16 @@ function WorkspaceSwitcher() {
         <p className="text-xs text-[var(--color-text-muted)] px-2.5 py-1">
           {t('noWorkspaceHint')}
         </p>
+      )}
+      {syncError && (
+        <button
+          type="button"
+          className="mt-2 w-full rounded border border-amber-300/60 bg-amber-50/60 px-2 py-1.5 text-left text-[11px] text-amber-700 hover:bg-amber-50"
+          title={syncError}
+          onClick={() => void loadWorkspaces()}
+        >
+          {t('workspaceSyncFailed')}
+        </button>
       )}
       <MissionChat open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>

@@ -55,6 +55,17 @@ Casdoor 管理员必须把 `CASDOOR_REDIRECT_URI` 原样登记到 Application。
 - `POST /api/v1/auth/logout`：撤销本地会话。
 - `GET /api/v1/me`：获取当前身份。
 
+工作区同步接口：
+
+- `GET /api/v1/workspaces`：分页读取当前用户的工作区及删除墓碑。
+- `PUT /api/v1/workspaces/{id}`：使用浏览器现有 UUID 幂等创建或更新工作区。
+- `GET /api/v1/workspaces/{id}`：读取当前用户拥有的活动工作区。
+- `DELETE /api/v1/workspaces/{id}`：写入删除墓碑，防止其他浏览器重新上传旧副本。
+
+`content_payload` 保存 KuaiLearning 前端拥有的使命与笔记；`context_snapshot` 保留给外部
+岗位/人才系统，浏览器同步接口不会覆盖该字段。当前只同步工作区元数据，课程、题库、
+术语和参考资料仍在 IndexedDB，后续按领域逐步迁移。
+
 HTTP 环境必须保持 `COOKIE_SECURE=false`；迁移 HTTPS 后应改为 `true`。Cookie 写接口
 要求浏览器 `Origin` 与 `PUBLIC_BASE_URL` 完全一致。
 

@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AuthContext, type AuthContextValue, type AuthUser } from './authContext';
-
-function loginUrl() {
-  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  return `/api/v1/auth/login?return_to=${encodeURIComponent(returnTo)}`;
-}
+import { loginUrl, redirectToLogin } from './navigation';
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -19,7 +15,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     })
       .then(async response => {
         if (response.status === 401) {
-          window.location.replace(loginUrl());
+          redirectToLogin();
           return;
         }
         if (!response.ok) {
