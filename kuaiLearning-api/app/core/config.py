@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     )
     database_echo: bool = False
     auth_mode: Literal["development", "external"] = "development"
+    public_base_url: str = ""
+    casdoor_issuer: str = ""
+    casdoor_client_id: str = ""
+    casdoor_client_secret: SecretStr = SecretStr("")
+    casdoor_redirect_uri: str = ""
+    session_cookie_name: str = "kuailearning_session"
+    session_ttl_seconds: int = Field(default=28_800, ge=300, le=2_592_000)
+    oidc_state_ttl_seconds: int = Field(default=600, ge=60, le=1_800)
+    cookie_secure: bool = False
     model_base_url: str = "https://api.deepseek.com/v1"
     model_api_key: SecretStr = SecretStr("")
     model_name: str = "deepseek-chat"
@@ -26,7 +35,31 @@ class Settings(BaseSettings):
     def reject_debug_auth_in_production(self) -> "Settings":
         if self.app_env == "production" and self.auth_mode == "development":
             raise ValueError("AUTH_MODE=development is forbidden in production")
+        if self.app_env == "production" and self.auth_mode == "external":
+            required = {
+                "CASDOOR_ISSUER": self.casdoor_issuer,
+                "CASDOOR_CLIENT_ID": self.casdoor_client_id,
+                "CASDOOR_CLIENT_SECRET": self.casdoor_client_secret.get_secret_value(),
+                "CASDOOR_REDIRECT_URI": self.casdoor_redirect_uri,
+                "PUBLIC_BASE_URL": self.public_base_url,
+            }
+            missing = [name for name, value in required.items() if not value]
+            if missing:
+                raise ValueError(
+                    f"Missing production authentication settings: {', '.join(missing)}"
+                )
         return self
+
+    def casdoor_is_configured(self) -> bool:
+        return all(
+            (
+                self.casdoor_issuer,
+                self.casdoor_client_id,
+                self.casdoor_client_secret.get_secret_value(),
+                self.casdoor_redirect_uri,
+                self.public_base_url,
+            )
+        )
 
 
 @lru_cache

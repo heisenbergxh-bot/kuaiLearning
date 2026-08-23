@@ -1,0 +1,230 @@
+# KuaiLearning 项目交接与迭代计划
+
+> 更新日期：2026-08-21
+>
+> 交接分支：`codex/backend-foundation`
+>
+> 本文用于在另一台电脑或由另一个 Agent 继续开发时快速恢复上下文。
+
+## 1. 项目背景
+
+KuaiLearning 最初是一个纯前端 AI 学习工作台。用户先描述学习使命，再由 AI 生成
+学习大纲、课程、测验、术语、参考文档和学习记录；业务数据主要保存在浏览器
+IndexedDB/localStorage 中。
+
+后续企业内网场景提出了三类新要求：
+
+1. 学习过程要能与岗位、职级和能力要求关联，但人才系统与 KuaiLearning 应保持解耦。
+2. 要支持学前诊断（苏格拉底式问答）和每节课的真实输出任务，而不只是“看课 + 做题”。
+3. 要支持多用户、统一登录、服务端持久化、审计和未来的内部课程资源接入。
+
+当前确定的架构方向：
+
+- 前端：React + TypeScript + Vite。
+- 后端：Python 3.11/3.12 + FastAPI + SQLAlchemy + Alembic。
+- Agent 编排：AgentScope；仅用于需要模型推理的环节，业务状态和事务仍由普通服务控制。
+- 数据库：MySQL。
+- 认证：公司 Casdoor OIDC；KuaiLearning 不自建账号密码体系。
+- 系统边界：KuaiLearning 专注学习闭环；岗位画像/人才系统通过上下文快照和学习证据事件交互，
+  不把完整人才管理能力耦合进本系统。
+
+完整岗位画像产品设计见
+[`kuaiLearning-app/docs/岗位画像与学习闭环功能设计.md`](kuaiLearning-app/docs/岗位画像与学习闭环功能设计.md)。
+
+## 2. 已经完成的工作
+
+### 2.1 原有前端能力
+
+- 对话式创建学习使命。
+- AI 生成课程大纲和逐节课程。
+- 课程阅读、课内测验、独立题库、术语、参考文档、学习记录和 AI 答疑。
+- IndexedDB/localStorage 本地持久化。
+- HTTP 环境下 ID 生成兼容处理，以及 AI 请求稳定性和前端测试。
+
+### 2.2 后端基础骨架
+
+- 新增 `kuaiLearning-api` FastAPI 工程。
+- 建立异步 SQLAlchemy/MySQL、配置管理、数据库会话和 Alembic 迁移。
+- 建立学习域基础模型：
+  - 学习工作区与课程；
+  - 诊断会话和诊断轮次；
+  - 真实输出任务和任务提交；
+  - 外部学习上下文快照；
+  - 学习证据事件。
+- 已提供健康检查、当前用户以及工作区创建/查询接口。
+- 已建立 AgentScope 苏格拉底式诊断适配器和结构化输出模型，但尚未接成完整可用的诊断 API 流程。
+- 数据库迁移：
+  - `20260820_0001`：初始学习域；
+  - `20260821_0002`：Casdoor 身份、登录状态和本地会话。
+
+### 2.3 Casdoor 统一登录
+
+- 实现 OIDC Authorization Code Flow。
+- 启用 S256 PKCE、state、nonce 和 JWKS/JWT 校验。
+- Casdoor Token 只在后端交换和验证，浏览器只保存 KuaiLearning 自己的 HttpOnly Session Cookie。
+- 实现：
+  - `GET /api/v1/auth/login`
+  - `GET /api/v1/auth/callback`
+  - `POST /api/v1/auth/logout`
+  - `GET /api/v1/me`
+- 增加写请求 Origin/CSRF 防护。
+- 前端增加认证门禁、当前用户展示和退出登录。
+- 本地开发保留 Debug User 适配，但生产环境会禁用。
+
+### 2.4 自动化验证
+
+本次提交前已通过：
+
+- 后端 Ruff。
+- 后端 Mypy（24 个源文件）。
+- 后端 Pytest（13 项）。
+- 两个 Alembic 迁移的离线 SQL 生成。
+- Python `pip check`。
+- 前端 TypeScript/Vite 构建。
+- 前端 Oxlint。
+- 前端 Vitest（13 项）。
+
+### 2.5 外网测试环境
+
+当前测试地址：
+
+- KuaiLearning：<http://81.71.157.238:8081>
+- API 健康检查：<http://81.71.157.238:8081/api/v1/health/live>
+- Casdoor Issuer：`http://81.71.157.238:8080`
+- 回调地址：`http://81.71.157.238:8081/api/v1/auth/callback`
+
+服务器部署状态：
+
+- 前端由 Nginx 8081 托管。
+- `/api/` 反向代理到 `127.0.0.1:8001`。
+- 后端由 `kuailearning-api.service` 管理。
+- 使用独立 MySQL 数据库 `kuailearning` 和最小范围数据库账号。
+- Alembic 已升级到 `20260821_0002 (head)`。
+- Nginx、API、MySQL、Casdoor 服务及外网健康检查均已验证正常。
+- Casdoor 已登记 8081 回调；授权入口返回正常页面，未拒绝 redirect URI。
+
+注意：测试服务器的密钥、数据库密码和 Casdoor Client Secret 不进入 Git，保存在服务器
+受限环境文件中。当前是 HTTP 测试环境，正式使用前应切换域名和 HTTPS，并设置
+`COOKIE_SECURE=true`。
+
+## 3. 当前“已实现”和“尚未实现”的边界
+
+后端现在是可以运行、迁移、登录和创建工作区的基础版本，不是完整业务后端。
+
+已经可用：
+
+- 服务健康检查。
+- Casdoor 登录链路和本地会话。
+- 当前用户身份。
+- 用户隔离的工作区创建、列表和详情。
+- 学习域数据库表结构。
+
+尚未完成：
+
+- 浏览器现有工作区/课程/题库数据同步到后端。
+- 前端课程、诊断、任务等页面改用后端 API。
+- 完整诊断 API、AgentScope 调用状态机和失败恢复。
+- 真实输出任务的创建、提交、反馈和证据闭环接口。
+- AI 请求迁移到后端；当前大部分生成能力仍是浏览器直连模型。
+- 后端课程、大纲、测验、术语和参考文档完整 CRUD。
+- 内部视频目录、字幕、观看进度以及两万条视频的标注流程。
+- 人才系统的数据同步协议和正式岗位画像系统。
+- 管理端、主管端、权限模型和审计页面。
+
+## 4. 接下来建议怎么做
+
+### P0：先把现有学习体验真正接到后端
+
+1. **完成真实登录回归**：使用一个有效 Casdoor 用户走完登录 → callback → `/me` → logout，
+   检查 Session 创建、过期和再次登录。当前只验证到了授权页及回调配置。
+2. **定义前后端 API 契约**：为工作区、大纲、课程、测验、术语、参考文档和学习记录建立
+   Pydantic Schema 与 TypeScript API Client。
+3. **渐进迁移本地数据**：保留 IndexedDB 作为临时缓存，增加一次性导入/同步，避免直接重写
+   全部前端导致已有功能回退。
+4. **把模型调用移到后端**：API Key 仅保存在服务端；统一超时、重试、限流、日志和模型配置。
+5. **补齐生产必需项**：结构化日志、请求 ID、错误码、数据库备份、服务监控和部署脚本。
+
+P0 验收标准：用户通过 Casdoor 登录后，换浏览器仍能看到自己的工作区和至少一门完整课程；
+浏览器中不再保存模型 API Key。
+
+### P1：跑通“诊断 → 学习 → 真实输出”的最小闭环
+
+建议只选择一个学习主题或“系统开发分析师 B6”的一项能力试点：
+
+1. 接通诊断会话 API，每次只提出一个苏格拉底式问题。
+2. 每轮持久化用户回答、模型判断、证据摘要和置信度。
+3. 3～7 轮后生成诊断结论、学习重点和可解释依据。
+4. 根据结论生成学习计划和每节课的真实输出任务。
+5. 支持文本/链接/附件式任务提交、AI 初评和人工确认入口。
+6. 课程、测验、任务提交形成 `LearningEvidenceEvent`，供未来人才系统读取。
+
+P1 验收标准：系统不只记录“完成课程”，还能展示用户提交了什么产物、满足了什么标准、
+还缺什么证据。
+
+### P2：与岗位画像和内部课程系统解耦集成
+
+1. 定义外部人才上下文接口：员工标识、岗位、职级、能力要求、目标等级和版本号。
+2. KuaiLearning 保存带版本的只读快照，不拥有岗位标准的编辑权。
+3. 定义学习证据事件接口或 Outbox，由人才系统拉取/订阅。
+4. 先导入视频目录元数据，确认能否取得字幕、观看进度和完成记录。
+5. 对少量高价值视频试点“转写 → AI 候选标签 → 人工审核 → 发布”，不要直接全量处理两万条。
+
+### P3：企业化能力
+
+- 主管审核、内容审核和管理员权限。
+- 审计日志、数据权限与敏感信息最小化。
+- HTTPS、域名、Cookie 安全策略和密钥管理。
+- 内网离线 wheel/npm 构建产物和可重复部署方案。
+- 监控、备份恢复、灰度发布和自动回滚。
+
+## 5. 需要业务方尽快确认的问题
+
+1. 第一批试点用户、岗位和职级是什么。
+2. 岗位能力 1～4 级是否允许 0.5 分，以及正式评分由谁确认。
+3. 测验、项目产物、自评和主管评价是否有固定权重。
+4. 内部视频平台能提供哪些接口：目录、字幕、观看记录、完成状态。
+5. 什么数据允许发给模型；内网最终使用哪种模型服务。
+6. 学习证据只用于发展建议，还是会进入正式人才评价流程。
+
+## 6. 新 Agent 接手步骤
+
+```powershell
+git clone https://github.com/heisenbergxh-bot/kuaiLearning.git
+cd kuaiLearning
+git switch codex/backend-foundation
+```
+
+前端：
+
+```powershell
+cd kuaiLearning-app
+npm ci
+npm run lint
+npm test
+npm run build
+```
+
+后端：
+
+```powershell
+cd ..\kuaiLearning-api
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+Copy-Item .env.example .env
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\mypy.exe app
+.\.venv\Scripts\pytest.exe
+```
+
+本地 MySQL 配置和 Casdoor 参数请按 `kuaiLearning-api/.env.example` 填写，不要提交 `.env`。
+
+## 7. 重要约束与注意事项
+
+- 不要把 KuaiLearning 变成完整人才系统；只消费人才上下文并输出学习证据。
+- 不要让 AgentScope 直接控制数据库事务或正式评价结果。
+- AI 可以给评分建议，正式岗位画像和能力等级必须由有权限的人确认。
+- 不要一次性重写前端数据层；优先使用渐进同步和兼容迁移。
+- 不要提交 `.env`、Client Secret、SSH 密钥、数据库密码或生产数据。
+- 根目录 `README.md` 主要描述旧的纯前端版本，后续在 P0 完成后应同步改写为新的整体架构说明。
+- 本地未跟踪的 `kuaiLearning-app/dist.zip` 和统一登录原始指南是个人交付/参考文件，
+  不属于本次代码提交。

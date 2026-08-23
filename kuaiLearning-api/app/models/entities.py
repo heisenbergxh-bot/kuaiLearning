@@ -28,6 +28,47 @@ class LearningWorkspace(IdMixin, TimestampMixin, Base):
     context_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
+class AuthIdentity(IdMixin, TimestampMixin, Base):
+    __tablename__ = "auth_identities"
+    __table_args__ = (
+        UniqueConstraint("issuer", "external_subject", name="uq_auth_identity_issuer_subject"),
+    )
+
+    issuer: Mapped[str] = mapped_column(String(255), nullable=False)
+    external_subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    preferred_username: Mapped[str | None] = mapped_column(String(255))
+    display_name: Mapped[str | None] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(320))
+    employee_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    last_login_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuthLoginState(IdMixin, TimestampMixin, Base):
+    __tablename__ = "auth_login_states"
+
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    code_verifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    return_to: Mapped[str] = mapped_column(String(1000), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=False
+    )
+
+
+class AuthSession(IdMixin, TimestampMixin, Base):
+    __tablename__ = "auth_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    identity_id: Mapped[str] = mapped_column(
+        ForeignKey("auth_identities.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class Lesson(IdMixin, TimestampMixin, Base):
     __tablename__ = "lessons"
     __table_args__ = (

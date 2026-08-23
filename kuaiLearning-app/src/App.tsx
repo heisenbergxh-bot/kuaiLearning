@@ -11,6 +11,7 @@ import { GlossaryPage } from './pages/GlossaryPage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
+import { AuthGate } from './auth/AuthGate';
 
 function AppContent() {
   const { loadWorkspaces } = useWorkspaceStore();
@@ -25,21 +26,23 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<AppContent />}>
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/workspace/:workspaceId/mission" element={<MissionPage />} />
-          <Route path="/workspace/:workspaceId/lessons" element={<LessonsPage />} />
-          <Route path="/workspace/:workspaceId/lesson/:lessonId" element={<LessonDetailPage />} />
-          <Route path="/workspace/:workspaceId/quiz" element={<QuizBankPage />} />
-          <Route path="/workspace/:workspaceId/references" element={<ReferencesPage />} />
-          <Route path="/workspace/:workspaceId/records" element={<LearningRecordsPage />} />
-          <Route path="/workspace/:workspaceId/glossary" element={<GlossaryPage />} />
-          <Route path="/workspace/:workspaceId/resources" element={<ResourcesPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+      <AuthGate>
+        <Routes>
+          <Route element={<AppContent />}>
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/workspace/:workspaceId/mission" element={<MissionPage />} />
+            <Route path="/workspace/:workspaceId/lessons" element={<LessonsPage />} />
+            <Route path="/workspace/:workspaceId/lesson/:lessonId" element={<LessonDetailPage />} />
+            <Route path="/workspace/:workspaceId/quiz" element={<QuizBankPage />} />
+            <Route path="/workspace/:workspaceId/references" element={<ReferencesPage />} />
+            <Route path="/workspace/:workspaceId/records" element={<LearningRecordsPage />} />
+            <Route path="/workspace/:workspaceId/glossary" element={<GlossaryPage />} />
+            <Route path="/workspace/:workspaceId/resources" element={<ResourcesPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </AuthGate>
     </BrowserRouter>
   );
 }

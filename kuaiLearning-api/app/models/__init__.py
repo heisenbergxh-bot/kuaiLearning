@@ -1,4 +1,7 @@
 from app.models.entities import (
+    AuthIdentity,
+    AuthLoginState,
+    AuthSession,
     DiagnosticSession,
     DiagnosticTurn,
     ExternalLearningContext,
@@ -10,6 +13,9 @@ from app.models.entities import (
 )
 
 __all__ = [
+    "AuthIdentity",
+    "AuthLoginState",
+    "AuthSession",
     "DiagnosticSession",
     "DiagnosticTurn",
     "ExternalLearningContext",

@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useTranslation } from '../i18n/useTranslation';
 import { MissionChat } from './MissionChat';
 import type { Workspace } from '../types';
+import { useAuth } from '../auth/authContext';
 
 function WorkspaceSwitcher() {
   const { workspaces, activeId, setActive, deleteWorkspace } = useWorkspaceStore();
@@ -70,6 +71,7 @@ export function Sidebar() {
   const activeId = useWorkspaceStore(s => s.activeId);
   const { t } = useTranslation();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const ws = `/workspace/${activeId || 'new'}`;
 
   const primaryLinks = [
@@ -149,6 +151,20 @@ export function Sidebar() {
       </nav>
 
       <div className="px-3 py-2 border-t border-[var(--color-border)]">
+        <div className="mb-1 flex items-center justify-between gap-2 px-3 py-1.5">
+          <span className="truncate text-xs text-[var(--color-text-muted)]" title={user.email || undefined}>
+            {user.display_name || user.preferred_username || '当前用户'}
+          </span>
+          {user.auth_source === 'casdoor' && (
+            <button
+              type="button"
+              className="shrink-0 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-accent)]"
+              onClick={() => void logout().catch(error => alert(error instanceof Error ? error.message : '退出失败'))}
+            >
+              退出
+            </button>
+          )}
+        </div>
         <NavLink
           to="/settings"
           className={({ isActive }) =>
