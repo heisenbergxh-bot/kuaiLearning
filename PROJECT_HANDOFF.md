@@ -139,6 +139,16 @@ IndexedDB/localStorage 中。
 - `MODEL_API_KEY` 当前尚未配置；除 AI 生成外的服务均正常。配置服务器环境文件并重启 API 后，
   才能进行真实大纲生成验收。
 
+### 2.9 内网离线发布工具（2026-08-24）
+
+- `deployment/offline/README.md`：可直接交给内网 AI 的分阶段执行手册和提示词。
+- 外网 Windows 脚本构建并验证前端 `dist`；外网匹配 Linux 脚本生成 wheelhouse，并在新虚拟
+  环境中执行一次 `--no-index` 断网安装验证。
+- 内网脚本会核对 CPU/Python、校验包内文件、为每个 API release 建立独立虚拟环境、迁移前
+  备份 MySQL，并在新 API 健康检查失败时切回旧软链接。
+- 脚本不会联网安装、不会修改已有 Nginx 配置、不会清理旧 release；Nginx 必须由内网 AI
+  根据当前 master process 的实际 `-p/-c` 参数检查后人工接入。
+
 注意：测试服务器的密钥、数据库密码和 Casdoor Client Secret 不进入 Git，保存在服务器
 受限环境文件中。当前是 HTTP 测试环境，正式使用前应切换域名和 HTTPS，并设置
 `COOKIE_SECURE=true`。
