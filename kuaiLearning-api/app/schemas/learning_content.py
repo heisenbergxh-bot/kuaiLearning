@@ -60,3 +60,9 @@ class SyllabusItemResponse(SyllabusItemWrite):
     workspace_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class SyllabusGenerateRequest(BaseModel):
+    mode: Literal["full", "replan"] = "full"
+    guidance: str | None = Field(default=None, max_length=2000)
+    language: Literal["zh", "en"] = "zh"

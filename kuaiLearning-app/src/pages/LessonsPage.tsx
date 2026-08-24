@@ -3,12 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTranslation } from '../i18n/useTranslation';
-import { generateSyllabus } from '../ai/client';
 import { generateAndSaveLesson } from '../lib/lessonGen';
 import { SyllabusRoadmap } from '../components/SyllabusRoadmap';
 import type { Lesson, SyllabusItem } from '../types';
-import { db, generateId } from '../db';
-import { deleteRemoteSyllabusItem } from '../api/learningContent';
+import { db } from '../db';
+import { generateRemoteSyllabus, syllabusItemFromRemote } from '../api/learningContent';
 import { synchronizeLearningContent } from '../api/learningContentSync';
 
 export function LessonsPage() {
@@ -50,51 +49,20 @@ export function LessonsPage() {
   }, [workspaceId, loadLessons, loadSyllabus]);
 
   const handleGenerateSyllabus = async (mode: 'full' | 'replan', guidance?: string) => {
-    if (!workspaceId || !settings.apiKey || generating) return;
+    if (!workspaceId || generating) return;
     setGenerating(true);
     setGenStatus(t('generatingSyllabus'));
     try {
-      const items = await generateSyllabus(settings, workspaceId, mode, guidance);
-      const now = Date.now();
-
-      let kept: SyllabusItem[] = [];
-      if (mode === 'replan') {
-        // Keep every item that already has a lesson (never delete generated work);
-        // drop only the not-yet-generated planned items.
-        kept = syllabus.filter(s => s.lessonId).sort((a, b) => a.order - b.order);
-        const drop = syllabus.filter(s => !s.lessonId).map(s => s.id);
-        await Promise.all(drop.map(id => deleteRemoteSyllabusItem(workspaceId, id)));
-        if (drop.length) await db.syllabusItems.bulkDelete(drop);
-        // Compact kept orders to 1..k so deleted planned items leave no gaps.
-        for (let i = 0; i < kept.length; i++) {
-          if (kept[i].order !== i + 1) {
-            await db.syllabusItems.update(kept[i].id, { order: i + 1, updatedAt: now });
-          }
-        }
-      } else {
-        // Fresh plan — replace everything.
-        await Promise.all(
-          syllabus.map(item => deleteRemoteSyllabusItem(workspaceId, item.id)),
-        );
+      const remoteItems = await generateRemoteSyllabus(
+        workspaceId,
+        mode,
+        settings.language,
+        guidance,
+      );
+      await db.transaction('rw', db.syllabusItems, async () => {
         await db.syllabusItems.where('workspaceId').equals(workspaceId).delete();
-      }
-
-      let order = mode === 'replan' ? kept.length : 0;
-      for (const it of items) {
-        order += 1;
-        await db.syllabusItems.add({
-          id: generateId(),
-          workspaceId,
-          order,
-          module: it.module || t('syllabusTitle'),
-          title: it.title,
-          description: it.description,
-          status: 'planned',
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-      await synchronizeLearningContent(workspaceId);
+        await db.syllabusItems.bulkPut(remoteItems.map(syllabusItemFromRemote));
+      });
       await loadSyllabus();
       setGenStatus(t('genDone'));
       setTimeout(() => setGenStatus(''), 2000);
@@ -150,7 +118,7 @@ export function LessonsPage() {
         items={syllabus}
         lessons={lessons}
         busy={generating}
-        hasApiKey={!!settings.apiKey}
+        hasLessonApiKey={!!settings.apiKey}
         onGenerateSyllabus={() => handleGenerateSyllabus('full')}
         onReplan={(guidance) => handleGenerateSyllabus('replan', guidance)}
         onGenerateItem={(item) => handleGenerate(item)}

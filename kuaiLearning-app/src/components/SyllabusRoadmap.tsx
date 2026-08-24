@@ -8,7 +8,7 @@ interface SyllabusRoadmapProps {
   items: SyllabusItem[];
   lessons: Lesson[];
   busy: boolean;
-  hasApiKey: boolean;
+  hasLessonApiKey: boolean;
   onGenerateSyllabus: () => void;
   onReplan: (guidance?: string) => void;
   onGenerateItem: (item: SyllabusItem) => void;
@@ -16,7 +16,7 @@ interface SyllabusRoadmapProps {
 }
 
 export function SyllabusRoadmap({
-  items, lessons, busy, hasApiKey,
+  items, lessons, busy, hasLessonApiKey,
   onGenerateSyllabus, onReplan, onGenerateItem, onOpenLesson,
 }: SyllabusRoadmapProps) {
   const { t } = useTranslation();
@@ -47,12 +47,11 @@ export function SyllabusRoadmap({
         <p className="text-xs text-[var(--color-text-muted)] mb-3">{t('noSyllabusHint')}</p>
         <button
           onClick={onGenerateSyllabus}
-          disabled={busy || !hasApiKey}
+          disabled={busy}
           className="px-4 py-2 bg-[var(--color-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy ? t('generatingSyllabus') : t('generateSyllabus')}
         </button>
-        {!hasApiKey && <p className="text-xs text-[var(--color-warning)] mt-2">{t('genNoApiKey')}</p>}
       </div>
     );
   }
@@ -79,7 +78,7 @@ export function SyllabusRoadmap({
         </div>
         <button
           onClick={() => setReplanOpen(o => !o)}
-          disabled={busy || !hasApiKey}
+          disabled={busy}
           className="px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-xs text-[var(--color-text)] hover:bg-[var(--color-accent-light)] transition-colors disabled:opacity-50"
         >
           {t('replanSyllabus')}
@@ -136,7 +135,7 @@ export function SyllabusRoadmap({
                     {status === 'planned' ? (
                       <button
                         onClick={() => onGenerateItem(it)}
-                        disabled={busy || !hasApiKey}
+                        disabled={busy || !hasLessonApiKey}
                         className="shrink-0 px-2.5 py-1 rounded-md border border-[var(--color-accent-border)] text-xs text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors disabled:opacity-50"
                       >
                         {t('generateThisLesson')}

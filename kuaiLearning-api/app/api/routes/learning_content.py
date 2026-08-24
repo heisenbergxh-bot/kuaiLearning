@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.current_user import CurrentUser, CurrentUserDependency
@@ -13,6 +13,9 @@ from app.schemas import (
     SyllabusItemResponse,
     SyllabusItemWrite,
 )
+from app.schemas.learning_content import SyllabusGenerateRequest
+from app.services.model_gateway import ModelGatewayDependency, ModelGatewayError
+from app.services.syllabus_generation import build_syllabus_prompt, parse_syllabus_response
 
 router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["learning-content"])
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
@@ -106,6 +109,100 @@ async def list_syllabus_items(
     session: DbSession,
 ) -> list[SyllabusItem]:
     await _require_workspace(workspace_id, user, session)
+    result = await session.scalars(
+        select(SyllabusItem)
+        .where(SyllabusItem.workspace_id == workspace_id)
+        .order_by(SyllabusItem.order_index.asc())
+    )
+    return list(result)
+
+
+@router.post("/syllabus/generate", response_model=list[SyllabusItemResponse])
+async def generate_syllabus(
+    workspace_id: str,
+    payload: SyllabusGenerateRequest,
+    user: CurrentUserDependency,
+    session: DbSession,
+    model_gateway: ModelGatewayDependency,
+) -> list[SyllabusItem]:
+    workspace = await session.scalar(
+        select(LearningWorkspace).where(
+            LearningWorkspace.id == workspace_id,
+            LearningWorkspace.owner_subject == user.subject,
+            LearningWorkspace.status != "deleted",
+        )
+    )
+    if workspace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+
+    existing = list(
+        await session.scalars(
+            select(SyllabusItem)
+            .where(SyllabusItem.workspace_id == workspace_id)
+            .order_by(SyllabusItem.order_index.asc())
+        )
+    )
+    kept = (
+        [item for item in existing if item.lesson_id is not None]
+        if payload.mode == "replan"
+        else []
+    )
+    prompt = build_syllabus_prompt(
+        workspace,
+        kept,
+        language=payload.language,
+        mode=payload.mode,
+        guidance=payload.guidance,
+    )
+    try:
+        raw_response = await model_gateway.complete(
+            system_prompt=prompt,
+            user_prompt="Design the course roadmap now.",
+            temperature=0.5,
+            max_tokens=3000,
+        )
+        generated = parse_syllabus_response(raw_response)
+    except ModelGatewayError as error:
+        error_status = {
+            "configuration": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "timeout": status.HTTP_504_GATEWAY_TIMEOUT,
+        }.get(error.kind, status.HTTP_502_BAD_GATEWAY)
+        raise HTTPException(status_code=error_status, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service returned an invalid syllabus",
+        ) from error
+
+    if payload.mode == "full":
+        await session.execute(delete(SyllabusItem).where(SyllabusItem.workspace_id == workspace_id))
+    else:
+        await session.execute(
+            delete(SyllabusItem).where(
+                SyllabusItem.workspace_id == workspace_id,
+                SyllabusItem.lesson_id.is_(None),
+            )
+        )
+        # Move retained rows away from the positive unique-order range before compacting them.
+        for index, item in enumerate(kept, start=1):
+            item.order_index = -index
+    await session.flush()
+
+    for index, item in enumerate(kept, start=1):
+        item.order_index = index
+    for offset, generated_item in enumerate(generated, start=len(kept) + 1):
+        session.add(
+            SyllabusItem(
+                workspace_id=workspace_id,
+                order_index=offset,
+                module_title=generated_item.module_title,
+                title=generated_item.title,
+                description=generated_item.description,
+                status="planned",
+            )
+        )
+    await session.commit()
+
     result = await session.scalars(
         select(SyllabusItem)
         .where(SyllabusItem.workspace_id == workspace_id)

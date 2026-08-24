@@ -136,6 +136,21 @@ export function listRemoteSyllabus(workspaceId: string): Promise<RemoteSyllabusI
   return requestJson(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/syllabus`);
 }
 
+export function generateRemoteSyllabus(
+  workspaceId: string,
+  mode: 'full' | 'replan',
+  language: 'zh' | 'en',
+  guidance?: string,
+): Promise<RemoteSyllabusItem[]> {
+  return requestJson(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/syllabus/generate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ mode, language, guidance: guidance || null }),
+    },
+  );
+}
+
 export function upsertRemoteLesson(lesson: Lesson): Promise<RemoteLesson> {
   return requestJson(
     `/api/v1/workspaces/${encodeURIComponent(lesson.workspaceId)}/lessons/${encodeURIComponent(lesson.id)}`,
