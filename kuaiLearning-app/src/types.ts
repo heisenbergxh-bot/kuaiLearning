@@ -123,9 +123,6 @@ export interface ChatMessage {
 }
 
 export interface Settings {
-  apiKey: string;
-  apiBaseUrl: string;
-  model: string;
   language: Language;
 }
 

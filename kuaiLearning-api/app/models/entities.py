@@ -17,6 +17,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, IdMixin, TimestampMixin
 
 
+class AIConfiguration(Base):
+    __tablename__ = "ai_configuration"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    encrypted_api_key: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class LearningWorkspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "learning_workspaces"
     __table_args__ = (Index("ix_workspace_owner_updated", "owner_subject", "updated_at"),)

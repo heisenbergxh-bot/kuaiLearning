@@ -9,7 +9,7 @@ import {
 } from './prompts';
 import { db } from '../db';
 import { readChatCompletionStream } from './streaming';
-import { fetchAI } from './request';
+import { fetchCompletion } from './request';
 
 type AIStreamCallback = (chunk: string) => void;
 
@@ -31,14 +31,12 @@ export async function generateSyllabus(
 
   const systemPrompt = buildSyllabusPrompt(workspace, learningRecords, keepItems, settings.language, mode, userRequest);
 
-  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchCompletion(workspaceId, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Design the course roadmap now.' },
@@ -81,14 +79,12 @@ export async function generateLesson(
 
   const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
 
-  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchCompletion(workspaceId, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userRequest || `Create Lesson ${lessons.length + 1} for me.` },
@@ -130,14 +126,12 @@ export async function generateLessonStream(
 
   const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
 
-  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchCompletion(workspaceId, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userRequest || `Create Lesson ${lessons.length + 1} for me.` },
@@ -154,7 +148,7 @@ export async function generateLessonStream(
   }
 
   if (!response.body) throw new Error('No response body');
-  const fullContent = await readChatCompletionStream(response.body, onChunk);
+  const fullContent = await readChatCompletionStream(response.body, onChunk, true);
 
   return parseLessonResponse(fullContent);
 }
@@ -167,6 +161,7 @@ export async function chatWithAI(
 ): Promise<string> {
   const lesson = await db.lessons.get(lessonId);
   if (!lesson) throw new Error('Lesson not found');
+  const workspaceId = lesson.workspaceId;
 
   const systemPrompt = buildChatPrompt(lesson.title, lesson.htmlContent, settings.language);
 
@@ -181,14 +176,12 @@ export async function chatWithAI(
     { role: 'user' as const, content: userMessage },
   ];
 
-  const response = await fetchAI(`${settings.apiBaseUrl}/chat/completions`, {
+  const response = await fetchCompletion(workspaceId, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.model,
       messages: chatMessages,
       stream: false,
       temperature: 0.7,

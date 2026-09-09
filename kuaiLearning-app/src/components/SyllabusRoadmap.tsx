@@ -8,7 +8,6 @@ interface SyllabusRoadmapProps {
   items: SyllabusItem[];
   lessons: Lesson[];
   busy: boolean;
-  hasLessonApiKey: boolean;
   onGenerateSyllabus: () => void;
   onReplan: (guidance?: string) => void;
   onGenerateItem: (item: SyllabusItem) => void;
@@ -16,7 +15,7 @@ interface SyllabusRoadmapProps {
 }
 
 export function SyllabusRoadmap({
-  items, lessons, busy, hasLessonApiKey,
+  items, lessons, busy,
   onGenerateSyllabus, onReplan, onGenerateItem, onOpenLesson,
 }: SyllabusRoadmapProps) {
   const { t } = useTranslation();
@@ -135,7 +134,7 @@ export function SyllabusRoadmap({
                     {status === 'planned' ? (
                       <button
                         onClick={() => onGenerateItem(it)}
-                        disabled={busy || !hasLessonApiKey}
+                        disabled={busy}
                         className="shrink-0 px-2.5 py-1 rounded-md border border-[var(--color-accent-border)] text-xs text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors disabled:opacity-50"
                       >
                         {t('generateThisLesson')}

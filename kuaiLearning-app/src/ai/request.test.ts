@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchAI } from './request';
+import { fetchAI, fetchCompletion } from './request';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -7,6 +7,13 @@ afterEach(() => {
 });
 
 describe('fetchAI', () => {
+  it('routes completions through the authenticated backend without a browser API key', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    await fetchCompletion('workspace/1', { method: 'POST', body: '{}' });
+    expect(fetch.mock.calls[0][0]).toBe('/api/v1/workspaces/workspace%2F1/ai/completions');
+    expect(fetch.mock.calls[0][1]?.credentials).toBe('include');
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+  });
   it('retries retryable HTTP responses', async () => {
     vi.useFakeTimers();
     const fetchMock = vi.spyOn(globalThis, 'fetch')

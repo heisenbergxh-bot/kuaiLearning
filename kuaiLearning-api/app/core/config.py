@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     model_api_key: SecretStr = SecretStr("")
     model_name: str = "deepseek-chat"
     model_timeout_seconds: int = Field(default=180, ge=5, le=600)
+    ai_config_admin_subjects: list[str] = Field(default_factory=list)
+    ai_config_encryption_key: SecretStr = SecretStr("")
 
     @model_validator(mode="after")
     def reject_debug_auth_in_production(self) -> "Settings":

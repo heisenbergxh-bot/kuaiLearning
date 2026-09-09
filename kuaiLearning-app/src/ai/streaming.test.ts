@@ -12,6 +12,18 @@ function streamFrom(parts: string[]): ReadableStream<Uint8Array> {
 }
 
 describe('readChatCompletionStream', () => {
+  it('rejects server errors rather than saving partial lessons', async () => {
+    await expect(readChatCompletionStream(streamFrom([
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
+      'data: {"error":{"message":"AI response reached the output limit"}}\n\n',
+    ]), undefined, true)).rejects.toThrow('output limit');
+  });
+
+  it('requires a completion marker for server streams', async () => {
+    await expect(readChatCompletionStream(streamFrom([
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
+    ]), undefined, true)).rejects.toThrow('before completion');
+  });
   it('preserves an SSE event split across network chunks', async () => {
     const onChunk = vi.fn();
     const stream = streamFrom([

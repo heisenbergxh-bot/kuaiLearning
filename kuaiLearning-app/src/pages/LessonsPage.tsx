@@ -74,7 +74,7 @@ export function LessonsPage() {
   };
 
   const handleGenerate = async (targetItem?: SyllabusItem) => {
-    if (!workspaceId || !settings.apiKey || generating) return;
+    if (!workspaceId || generating) return;
     setGenerating(true);
     setGenStatus(t('genPreparing'));
     try {
@@ -118,18 +118,14 @@ export function LessonsPage() {
         items={syllabus}
         lessons={lessons}
         busy={generating}
-        hasLessonApiKey={!!settings.apiKey}
         onGenerateSyllabus={() => handleGenerateSyllabus('full')}
         onReplan={(guidance) => handleGenerateSyllabus('replan', guidance)}
         onGenerateItem={(item) => handleGenerate(item)}
         onOpenLesson={(lessonId, tab) => navigate(`/workspace/${workspaceId}/lesson/${lessonId}?tab=${tab}`)}
       />
 
-      {(genStatus || !settings.apiKey) && (
+      {(genStatus) && (
         <div className="mb-8 -mt-2">
-          {!settings.apiKey && (
-            <p className="text-xs text-[var(--color-warning)]">{t('genNoApiKey')}</p>
-          )}
           {genStatus && (
             <p className="text-xs text-[var(--color-text-muted)] mt-1 font-mono truncate">{genStatus}</p>
           )}

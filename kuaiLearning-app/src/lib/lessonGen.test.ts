@@ -11,9 +11,6 @@ vi.mock('../ai/client', () => ({
 }));
 
 const settings: Settings = {
-  apiKey: 'test-key',
-  apiBaseUrl: 'https://example.test/v1',
-  model: 'test-model',
   language: 'en',
 };
 

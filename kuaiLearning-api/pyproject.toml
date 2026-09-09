@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "KuaiLearning learning backend"
 requires-python = ">=3.11,<3.13"
 dependencies = [
+  "cryptography>=43,<51",
   "agentscope==1.0.21",
   "alembic>=1.14,<2",
   "asyncmy>=0.2.10,<1",
@@ -24,6 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "aiosqlite>=0.20,<1",
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
   "pytest-asyncio>=0.25,<1",

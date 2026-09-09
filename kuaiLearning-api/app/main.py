@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request, status
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
@@ -15,6 +17,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/docs" if settings.app_env != "production" else None,
         redoc_url=None,
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def safe_validation_error(request: Request, exc: RequestValidationError) -> Response:
+        if request.url.path.rstrip("/") == "/api/v1/settings/ai":
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "detail": [
+                        {key: error[key] for key in ("type", "loc", "msg")}
+                        for error in exc.errors()
+                    ]
+                },
+            )
+        return await request_validation_exception_handler(request, exc)
 
     @app.middleware("http")
     async def reject_cross_origin_cookie_writes(

@@ -57,7 +57,7 @@ export function LessonDetailPage() {
   };
 
   const handleRegenerate = async () => {
-    if (!lesson || !workspaceId || !settings.apiKey || busy) return;
+    if (!lesson || !workspaceId || busy) return;
     setBusy(true);
     setBusyStatus(t('genPreparing'));
     const guidance = regenText.trim() || undefined;
@@ -172,12 +172,11 @@ export function LessonDetailPage() {
       <div className="mb-4 flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setRegenOpen(o => !o)}
-          disabled={busy || !settings.apiKey}
+          disabled={busy}
           className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-accent-light)] transition-colors disabled:opacity-50"
         >
           ↻ {t('regenerate')}
         </button>
-        {!settings.apiKey && <span className="text-xs text-[var(--color-warning)]">{t('genNoApiKey')}</span>}
       </div>
 
       {regenOpen && (

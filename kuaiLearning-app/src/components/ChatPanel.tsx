@@ -43,7 +43,7 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || sending || !settings.apiKey) return;
+    if (!text || sending) return;
 
     setInput('');
     setError('');
@@ -166,23 +166,18 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('chatPlaceholder')}
-          disabled={sending || !settings.apiKey}
+          disabled={sending}
           className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent-border)] transition-all disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={sending || !input.trim() || !settings.apiKey}
+          disabled={sending || !input.trim()}
           className="px-4 py-1.5 bg-[var(--color-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? '...' : t('send')}
         </button>
       </div>
 
-      {!settings.apiKey && (
-        <div className="px-3 pb-2">
-          <p className="text-xs text-[var(--color-warning)]">{t('genNoApiKey')}</p>
-        </div>
-      )}
     </div>
   );
 }

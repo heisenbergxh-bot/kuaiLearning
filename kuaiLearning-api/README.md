@@ -79,6 +79,60 @@ HTTP 环境必须保持 `COOKIE_SECURE=false`；迁移 HTTPS 后应改为 `true`
 
 ## 验证
 
+### 服务端 AI 配置接口
+
+- `GET /api/v1/settings/ai`：登录后读取统一模型配置。响应包含 `base_url`、`model`、
+  `api_key_configured`、`source`（`database` 或 `environment`）和 `can_edit`，不返回密钥。
+- `PUT /api/v1/settings/ai`：仅允许 `AI_CONFIG_ADMIN_SUBJECTS` 中的用户保存统一配置。
+  账号标识使用 `/api/v1/me` 返回的 `subject`，不是用户名或邮箱。名单为空时禁止修改。
+
+请求示例：
+
+```json
+{
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "api_key": "实际密钥"
+}
+```
+
+首次保存必须提交非空密钥；后续省略 `api_key` 或传 `null` 会保留已保存的密钥，
+传空字符串会返回 422。地址仅接受 HTTP(S)，不能包含用户名、密码、查询参数或片段。
+内网模型地址可用；只有管理员能修改这个服务端请求目标。
+
+部署前安装依赖并执行 `alembic upgrade head`，然后在 `/opt/kuailearning/api.env` 中设置：
+
+```dotenv
+AI_CONFIG_ADMIN_SUBJECTS='["管理员的subject"]'
+AI_CONFIG_ENCRYPTION_KEY=生成的Fernet密钥
+```
+
+使用后端 Python 环境运行以下命令生成加密密钥，并安全保存输出到上述配置文件：
+
+```bash
+python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+```
+
+新增环境配置后重启 API。加密密钥必须稳定保留，数据库恢复时也需要同一密钥；
+不要在每次启动时重新生成。未配置或格式错误时，保存接口返回 503。
+数据库中只存放加密后的 API Key，读取与保存响应均不回传密钥。
+生产 Cookie 写请求仍须提供与 `PUBLIC_BASE_URL` 一致的 `Origin`。
+
+生成大纲在每次请求时读取数据库配置，保存后无需重启；尚无数据库记录时使用原有
+`MODEL_*` 环境配置。配置损坏或无法解密时返回 503，不会静默切换到其他密钥。
+`api_key_configured` 表示已提供密钥，不代表已验证供应商连通性或余额。
+
+前端设置页仅保留“AI 模型配置”，大纲、课程生成和聊天共用服务器配置。
+依据 `can_edit` 控制编辑，空白密钥输入表示保留已保存密钥。
+首次保存数据库配置仍需要提供密钥；浏览器只保存语言偏好，旧版本的本地密钥会被清除。
+
+`POST /api/v1/workspaces/{workspace_id}/ai/completions` 为课程和聊天提供统一模型调用，
+校验登录状态与工作区所有权。请求允许 `messages`、`stream`、`temperature`、`max_tokens`，
+不允许指定模型、地址或密钥。支持普通响应及 SSE 流式正文；流中断或截断返回错误，
+前端不会保存不完整课程。课程仍经 `generateAndSaveLesson` 保存并同步。
+
+### 本地检查
+
 ```powershell
 .\.venv\Scripts\ruff.exe check .
 .\.venv\Scripts\mypy.exe app
