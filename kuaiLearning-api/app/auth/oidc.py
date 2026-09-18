@@ -105,7 +105,7 @@ class CasdoorOidcClient:
         try:
             response = await self._http.post(
                 url,
-                params={"logoutAll": "false"},
+                params={"logoutAll": "true"},
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             response.raise_for_status()

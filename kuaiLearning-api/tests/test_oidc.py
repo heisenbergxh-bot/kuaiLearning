@@ -91,10 +91,10 @@ def test_authorization_url_can_force_account_prompt_after_logout() -> None:
 
 
 @pytest.mark.asyncio
-async def test_logout_uses_access_token_for_current_casdoor_session() -> None:
+async def test_logout_uses_access_token_to_end_all_casdoor_sessions() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/sso-logout"
-        assert request.url.params["logoutAll"] == "false"
+        assert request.url.params["logoutAll"] == "true"
         assert request.headers["Authorization"] == "Bearer access-token"
         return httpx.Response(200, json={"status": "ok", "msg": "", "data": ""})
 
