@@ -100,4 +100,9 @@ async def logout(
         httponly=True,
         samesite="lax",
     )
+    if settings.casdoor_is_configured():
+        response.headers["X-Casdoor-Logout-Url"] = (
+            f"{settings.casdoor_issuer.rstrip('/')}/api/sso-logout?logoutAll=false"
+        )
+    response.headers["Cache-Control"] = "no-store"
     return response

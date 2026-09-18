@@ -40,6 +40,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
           credentials: 'include',
         });
         if (!response.ok) throw new Error('退出失败，请稍后重试');
+        const ssoLogoutUrl = response.headers.get('X-Casdoor-Logout-Url');
+        if (ssoLogoutUrl) {
+          const ssoResponse = await fetch(ssoLogoutUrl, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { Accept: 'application/json' },
+          });
+          if (!ssoResponse.ok) {
+            throw new Error('统一登录退出失败，请稍后重试');
+          }
+        }
         window.location.replace(loginUrl());
       },
     };
