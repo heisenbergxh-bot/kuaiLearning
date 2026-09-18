@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 import httpx
@@ -11,6 +12,7 @@ from app.core.config import Settings, get_settings
 from app.db.session import get_db_session
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+logger = logging.getLogger(__name__)
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 SettingsDependency = Annotated[Settings, Depends(get_settings)]
 
@@ -129,10 +131,10 @@ async def logout(
             async with httpx.AsyncClient(timeout=15, follow_redirects=False) as http:
                 await CasdoorOidcClient(settings, http).logout(sso_access_token)
         except AuthenticationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
-            ) from exc
+            # Logout is intentionally idempotent: an expired/revoked Casdoor token
+            # already represents the desired remote state. Always continue clearing
+            # the local session so a transient IdP failure cannot trap the user.
+            logger.warning("Casdoor logout did not complete; clearing local session", exc_info=exc)
     if raw_session_token:
         await revoke_session(session, raw_session_token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)

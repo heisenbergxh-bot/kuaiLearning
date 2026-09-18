@@ -3,6 +3,8 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.routes.auth import CasdoorOidcClient
+from app.auth.oidc import AuthenticationError
 from app.core.config import Settings, get_settings
 from app.main import create_app
 
@@ -99,6 +101,39 @@ def test_external_cookie_writes_require_same_origin() -> None:
     assert "X-Casdoor-Logout-Url" not in accepted.headers
     assert accepted.cookies["kuailearning_session_logged_out"] == "1"
     assert accepted.headers["Cache-Control"] == "no-store"
+
+
+def test_logout_clears_local_cookies_when_casdoor_token_is_already_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        app_env="test",
+        auth_mode="external",
+        public_base_url="http://learning.test",
+        casdoor_issuer="http://casdoor.test",
+        casdoor_client_id="kuailearning",
+        casdoor_client_secret="secret",
+        casdoor_redirect_uri="http://learning.test/api/v1/auth/callback",
+    )
+    app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    async def already_logged_out(_client: CasdoorOidcClient, _token: str) -> None:
+        raise AuthenticationError("Casdoor token is already invalid")
+
+    monkeypatch.setattr(CasdoorOidcClient, "logout", already_logged_out)
+
+    with TestClient(app) as client:
+        client.cookies.set("kuailearning_session_sso", "expired-token")
+        response = client.post(
+            "/api/v1/auth/logout",
+            headers={"Origin": "http://learning.test"},
+        )
+
+    assert response.status_code == 204
+    assert response.cookies["kuailearning_session_logged_out"] == "1"
+    assert "kuailearning_session_sso=\"\"" in response.headers["set-cookie"]
+    assert response.headers["Cache-Control"] == "no-store"
 
 
 def test_production_cannot_enable_debug_identity_headers() -> None:
