@@ -22,6 +22,7 @@ from app.models import AuthIdentity, AuthLoginState, AuthSession
 @dataclass(frozen=True, slots=True)
 class CompletedLogin:
     session_token: str
+    access_token: str
     return_to: str
 
 
@@ -30,6 +31,8 @@ async def begin_login(
     session: AsyncSession,
     http: httpx.AsyncClient,
     return_to: str | None,
+    *,
+    force_login: bool = False,
 ) -> str:
     now = datetime.now(UTC)
     await session.execute(delete(AuthLoginState).where(AuthLoginState.expires_at <= now))
@@ -54,6 +57,7 @@ async def begin_login(
         state=state,
         verifier=verifier,
         nonce=nonce,
+        force_login=force_login,
     )
 
 
@@ -99,7 +103,11 @@ async def complete_login(
         )
     )
     await session.commit()
-    return CompletedLogin(session_token=raw_session_token, return_to=return_to)
+    return CompletedLogin(
+        session_token=raw_session_token,
+        access_token=tokens.access_token,
+        return_to=return_to,
+    )
 
 
 async def _upsert_identity(session: AsyncSession, external_identity: OidcIdentity) -> AuthIdentity:

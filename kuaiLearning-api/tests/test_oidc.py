@@ -63,6 +63,46 @@ def test_authorization_url_contains_pkce_nonce_and_exact_redirect() -> None:
     assert query["code_challenge_method"] == ["S256"]
 
 
+def test_authorization_url_can_force_account_prompt_after_logout() -> None:
+    settings = Settings(
+        casdoor_issuer="http://casdoor.test",
+        casdoor_client_id="kuailearning",
+        casdoor_client_secret="secret",
+        casdoor_redirect_uri="http://learning.test/api/v1/auth/callback",
+    )
+    metadata = OidcMetadata(
+        issuer="http://casdoor.test",
+        authorization_endpoint="http://casdoor.test/login/oauth/authorize",
+        token_endpoint="http://casdoor.test/token",
+        userinfo_endpoint="http://casdoor.test/userinfo",
+        jwks_uri="http://casdoor.test/jwks",
+    )
+    client = CasdoorOidcClient(settings, http=None)  # type: ignore[arg-type]
+
+    url = client.authorization_url(
+        metadata,
+        state="state-value",
+        verifier="verifier-value",
+        nonce="nonce-value",
+        force_login=True,
+    )
+
+    assert parse_qs(urlsplit(url).query)["prompt"] == ["login"]
+
+
+@pytest.mark.asyncio
+async def test_logout_uses_access_token_for_current_casdoor_session() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/sso-logout"
+        assert request.url.params["logoutAll"] == "false"
+        assert request.headers["Authorization"] == "Bearer access-token"
+        return httpx.Response(200, json={"status": "ok", "msg": "", "data": ""})
+
+    settings = Settings(casdoor_issuer="http://casdoor.test")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        await CasdoorOidcClient(settings, http).logout("access-token")
+
+
 @pytest.mark.asyncio
 async def test_id_token_is_verified_with_jwks_and_userinfo() -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

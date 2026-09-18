@@ -96,9 +96,8 @@ def test_external_cookie_writes_require_same_origin() -> None:
 
     assert rejected.status_code == 403
     assert accepted.status_code == 204
-    assert accepted.headers["X-Casdoor-Logout-Url"] == (
-        "http://casdoor.test/api/sso-logout?logoutAll=false"
-    )
+    assert "X-Casdoor-Logout-Url" not in accepted.headers
+    assert accepted.cookies["kuailearning_session_logged_out"] == "1"
     assert accepted.headers["Cache-Control"] == "no-store"
 
 

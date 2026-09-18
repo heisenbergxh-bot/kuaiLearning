@@ -83,20 +83,37 @@ class CasdoorOidcClient:
         state: str,
         verifier: str,
         nonce: str,
+        force_login: bool = False,
     ) -> str:
-        query = urlencode(
-            {
-                "response_type": "code",
-                "client_id": self._settings.casdoor_client_id,
-                "redirect_uri": self._settings.casdoor_redirect_uri,
-                "scope": "openid profile email",
-                "state": state,
-                "nonce": nonce,
-                "code_challenge": pkce_challenge(verifier),
-                "code_challenge_method": "S256",
-            }
-        )
+        query_params = {
+            "response_type": "code",
+            "client_id": self._settings.casdoor_client_id,
+            "redirect_uri": self._settings.casdoor_redirect_uri,
+            "scope": "openid profile email",
+            "state": state,
+            "nonce": nonce,
+            "code_challenge": pkce_challenge(verifier),
+            "code_challenge_method": "S256",
+        }
+        if force_login:
+            query_params["prompt"] = "login"
+        query = urlencode(query_params)
         return f"{metadata.authorization_endpoint}?{query}"
+
+    async def logout(self, access_token: str) -> None:
+        url = f"{self._settings.casdoor_issuer.rstrip('/')}/api/sso-logout"
+        try:
+            response = await self._http.post(
+                url,
+                params={"logoutAll": "false"},
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or payload.get("status") != "ok":
+                raise ValueError("Casdoor returned an unsuccessful logout response")
+        except (httpx.HTTPError, ValueError) as exc:
+            raise AuthenticationError("Unable to end the Casdoor session") from exc
 
     async def exchange_code(
         self, metadata: OidcMetadata, *, code: str, verifier: str

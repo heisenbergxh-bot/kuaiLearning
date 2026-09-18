@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.oidc import AuthenticationError
+from app.auth.oidc import AuthenticationError, CasdoorOidcClient
 from app.auth.service import begin_login, complete_login, revoke_session
 from app.core.config import Settings, get_settings
 from app.db.session import get_db_session
@@ -13,6 +13,14 @@ from app.db.session import get_db_session
 router = APIRouter(prefix="/auth", tags=["authentication"])
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 SettingsDependency = Annotated[Settings, Depends(get_settings)]
+
+
+def _sso_token_cookie_name(settings: Settings) -> str:
+    return f"{settings.session_cookie_name}_sso"
+
+
+def _logged_out_cookie_name(settings: Settings) -> str:
+    return f"{settings.session_cookie_name}_logged_out"
 
 
 def _require_casdoor(settings: Settings) -> None:
@@ -25,17 +33,33 @@ def _require_casdoor(settings: Settings) -> None:
 
 @router.get("/login")
 async def login(
+    request: Request,
     session: DbSession,
     settings: SettingsDependency,
     return_to: Annotated[str | None, Query(max_length=1000)] = None,
 ) -> RedirectResponse:
     _require_casdoor(settings)
+    force_login = request.cookies.get(_logged_out_cookie_name(settings)) == "1"
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=False) as http:
-            target = await begin_login(settings, session, http, return_to)
+            target = await begin_login(
+                settings,
+                session,
+                http,
+                return_to,
+                force_login=force_login,
+            )
     except AuthenticationError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     response = RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+    if force_login:
+        response.delete_cookie(
+            _logged_out_cookie_name(settings),
+            path="/",
+            secure=settings.cookie_secure,
+            httponly=True,
+            samesite="lax",
+        )
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -79,6 +103,15 @@ async def callback(
         samesite="lax",
         path="/",
     )
+    response.set_cookie(
+        key=_sso_token_cookie_name(settings),
+        value=completed.access_token,
+        max_age=settings.session_ttl_seconds,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/api/v1/auth",
+    )
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -90,6 +123,16 @@ async def logout(
     settings: SettingsDependency,
 ) -> Response:
     raw_session_token = request.cookies.get(settings.session_cookie_name)
+    sso_access_token = request.cookies.get(_sso_token_cookie_name(settings))
+    if sso_access_token and settings.casdoor_is_configured():
+        try:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=False) as http:
+                await CasdoorOidcClient(settings, http).logout(sso_access_token)
+        except AuthenticationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
     if raw_session_token:
         await revoke_session(session, raw_session_token)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -100,9 +143,21 @@ async def logout(
         httponly=True,
         samesite="lax",
     )
-    if settings.casdoor_is_configured():
-        response.headers["X-Casdoor-Logout-Url"] = (
-            f"{settings.casdoor_issuer.rstrip('/')}/api/sso-logout?logoutAll=false"
-        )
+    response.delete_cookie(
+        _sso_token_cookie_name(settings),
+        path="/api/v1/auth",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    response.set_cookie(
+        key=_logged_out_cookie_name(settings),
+        value="1",
+        max_age=120,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
     response.headers["Cache-Control"] = "no-store"
     return response
