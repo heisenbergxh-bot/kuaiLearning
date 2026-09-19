@@ -6,8 +6,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import fitz
 import httpx
+import pymupdf as fitz
 from fastembed import TextEmbedding
 from sqlalchemy import delete, select
 
@@ -20,15 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=2)
-def _embedding_model(model_name: str) -> TextEmbedding:
-    return TextEmbedding(model_name=model_name, lazy_load=True)
+def _embedding_model(model_name: str, cache_dir: str) -> TextEmbedding:
+    return TextEmbedding(model_name=model_name, cache_dir=cache_dir, threads=1, lazy_load=True)
 
 
 async def _embed(texts: list[str], settings: Settings) -> list[list[float]]:
     def run() -> list[list[float]]:
         return [
             vector.tolist()
-            for vector in _embedding_model(settings.embedding_model).embed(texts)
+            for vector in _embedding_model(
+                settings.embedding_model, settings.embedding_cache_dir
+            ).embed(texts)
         ]
 
     return await asyncio.to_thread(run)

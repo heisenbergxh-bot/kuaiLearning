@@ -55,6 +55,6 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["agentscope", "agentscope.*", "fitz", "fitz.*"]
+module = ["agentscope", "agentscope.*", "pymupdf", "pymupdf.*"]
 follow_imports = "skip"
 ignore_missing_imports = true

@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = "kuailearning_knowledge"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_dimensions: int = Field(default=384, ge=32, le=4096)
+    embedding_cache_dir: str = "/opt/kuailearning/fastembed-cache"
     meilisearch_url: str = "http://127.0.0.1:7700"
     meilisearch_api_key: SecretStr = SecretStr("")
     meilisearch_knowledge_index: str = "kuailearning_knowledge"
