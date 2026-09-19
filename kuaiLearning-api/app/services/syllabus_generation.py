@@ -18,6 +18,7 @@ def build_syllabus_prompt(
     language: Literal["zh", "en"],
     mode: Literal["full", "replan"],
     guidance: str | None,
+    knowledge_context: str = "",
 ) -> str:
     payload: dict[str, Any] = workspace.content_payload or {}
     mission = payload.get("mission") or {}
@@ -36,6 +37,14 @@ def build_syllabus_prompt(
     guidance_block = (
         f"\n## Learner adjustment request (must follow)\n{guidance}" if guidance else ""
     )
+    knowledge_block = (
+        "\n## Uploaded learning materials\n"
+        "Use these excerpts as the primary basis for the roadmap. Cover their important topics "
+        "without inventing chapters or facts not present in the excerpts.\n"
+        f"{knowledge_context}"
+        if knowledge_context
+        else ""
+    )
 
     return f"""You are an expert curriculum designer. Design a learning roadmap for one learner.
 
@@ -48,7 +57,7 @@ Why: {mission.get('why') or 'Not specified'}
 Success looks like: {'; '.join(str(item) for item in success) or 'Not specified'}
 Constraints: {mission.get('constraints') or 'None specified'}
 Out of scope: {mission.get('out_of_scope') or 'None specified'}
-{kept_block}{guidance_block}
+{kept_block}{guidance_block}{knowledge_block}
 
 ## Requirements
 - Build 3-5 progressive modules and 8-14 tightly scoped lessons in total.

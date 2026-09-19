@@ -33,6 +33,7 @@ DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 SettingsDependency = Annotated[Settings, Depends(get_settings)]
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".md", ".markdown"}
+ALLOWED_SOURCE_TYPES = {"core", "supplementary", "exam", "notes", "document"}
 
 
 async def _source_for_user(
@@ -84,12 +85,15 @@ async def upload_source(
     settings: SettingsDependency,
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form(max_length=300)] = None,
+    source_type: Annotated[str, Form(max_length=32)] = "core",
 ) -> KnowledgeSource:
     await _require_workspace(workspace_id, user, session)
     original_filename = Path(file.filename or "document").name
     extension = Path(original_filename).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(415, "目前支持 PDF、TXT 和 Markdown 文件")
+    if source_type not in ALLOWED_SOURCE_TYPES:
+        raise HTTPException(422, "不支持的资料类型")
 
     source_id = str(uuid4())
     upload_dir = Path(settings.knowledge_upload_dir) / workspace_id
@@ -116,7 +120,7 @@ async def upload_source(
         workspace_id=workspace_id,
         owner_subject=user.subject,
         title=(title or Path(original_filename).stem).strip() or "未命名资料",
-        source_type="document",
+        source_type=source_type,
         original_filename=original_filename,
         mime_type=file.content_type,
         storage_path=str(destination),

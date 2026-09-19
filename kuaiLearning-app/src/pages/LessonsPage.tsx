@@ -9,6 +9,7 @@ import type { Lesson, SyllabusItem } from '../types';
 import { db } from '../db';
 import { generateRemoteSyllabus, syllabusItemFromRemote } from '../api/learningContent';
 import { synchronizeLearningContent } from '../api/learningContentSync';
+import { listKnowledgeSources, type KnowledgeSource } from '../api/knowledge';
 
 export function LessonsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -16,13 +17,14 @@ export function LessonsPage() {
   const { workspaces } = useWorkspaceStore();
   const { settings } = useSettingsStore();
   const workspace = workspaces.find(w => w.id === workspaceId);
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [syllabus, setSyllabus] = useState<SyllabusItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState('');
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
 
 
   const loadLessons = useCallback(async () => {
@@ -37,6 +39,11 @@ export function LessonsPage() {
     setSyllabus(result.sort((a, b) => a.order - b.order));
   }, [workspaceId]);
 
+  const loadKnowledgeSources = useCallback(async () => {
+    if (!workspaceId) return;
+    setKnowledgeSources(await listKnowledgeSources(workspaceId));
+  }, [workspaceId]);
+
   useEffect(() => {
     if (workspaceId) {
       void synchronizeLearningContent(workspaceId)
@@ -45,11 +52,22 @@ export function LessonsPage() {
           void loadLessons();
           void loadSyllabus();
         });
+      void loadKnowledgeSources().catch(reason => console.warn('Knowledge source loading failed.', reason));
     }
-  }, [workspaceId, loadLessons, loadSyllabus]);
+  }, [workspaceId, loadLessons, loadSyllabus, loadKnowledgeSources]);
+
+  useEffect(() => {
+    if (!knowledgeSources.some(source => source.status === 'pending' || source.status === 'processing')) return;
+    const timer = window.setInterval(() => void loadKnowledgeSources(), 3000);
+    return () => window.clearInterval(timer);
+  }, [knowledgeSources, loadKnowledgeSources]);
 
   const handleGenerateSyllabus = async (mode: 'full' | 'replan', guidance?: string) => {
     if (!workspaceId || generating) return;
+    if (knowledgeSources.some(source => source.status === 'pending' || source.status === 'processing')) {
+      setGenStatus(lang === 'zh' ? '资料仍在解析，请等待完成后再生成学习路线。' : 'Materials are still processing. Please wait before generating the roadmap.');
+      return;
+    }
     setGenerating(true);
     setGenStatus(t('generatingSyllabus'));
     try {
@@ -113,6 +131,12 @@ export function LessonsPage() {
     <div className="fade-in max-w-2xl">
       <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('lessonsTitle')}</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-6">{t('lessonsDesc')}</p>
+
+      <CourseSourcesPanel
+        sources={knowledgeSources}
+        lang={lang}
+        onManage={() => navigate(`/workspace/${workspaceId}/resources`)}
+      />
 
       <SyllabusRoadmap
         items={syllabus}
@@ -189,6 +213,38 @@ export function LessonsPage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSource[]; lang: 'zh' | 'en'; onManage: () => void }) {
+  const ready = sources.filter(source => source.status === 'ready');
+  const processing = sources.filter(source => source.status === 'pending' || source.status === 'processing');
+  const labels: Record<string, string> = lang === 'zh'
+    ? { core: '核心教材', supplementary: '补充资料', exam: '题库/考试', notes: '个人笔记', document: '学习资料' }
+    : { core: 'Core', supplementary: 'Supplementary', exam: 'Exam', notes: 'Notes', document: 'Material' };
+
+  return (
+    <div className="mb-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-text-heading)]">{lang === 'zh' ? '课程依据' : 'Course materials'}</h3>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+            {ready.length > 0
+              ? (lang === 'zh' ? `${ready.length} 份资料将用于规划路线、生成课时和答疑。` : `${ready.length} material(s) will ground the roadmap, lessons, and chat.`)
+              : (lang === 'zh' ? '还没有可用资料，可以上传教材后再生成学习路线。' : 'No ready materials. Upload a source before generating the roadmap.')}
+          </p>
+        </div>
+        <button onClick={onManage} className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-xs hover:bg-[var(--color-accent-light)]">
+          {lang === 'zh' ? (sources.length ? '管理资料' : '上传资料') : (sources.length ? 'Manage' : 'Upload')}
+        </button>
+      </div>
+      {ready.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ready.map(source => <span key={source.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/40 px-2.5 py-1 text-xs text-[var(--color-text)]"><span className="text-[10px] text-[var(--color-accent)]">{labels[source.source_type] || labels.document}</span><span className="max-w-52 truncate">{source.title}</span></span>)}
+        </div>
+      )}
+      {processing.length > 0 && <p className="mt-2 text-xs text-amber-600">{lang === 'zh' ? `${processing.length} 份资料正在解析，完成前不会生成学习路线。` : `${processing.length} material(s) are processing. Roadmap generation will wait.`}</p>}
     </div>
   );
 }

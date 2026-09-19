@@ -2,6 +2,7 @@ from typing import Any
 
 import pytest
 
+import app.api.routes.learning_content as learning_content_route
 from app.api.routes.learning_content import generate_syllabus
 from app.core.config import Settings
 from app.core.current_user import CurrentUser
@@ -97,6 +98,20 @@ def test_prompt_uses_server_workspace_mission_and_guidance() -> None:
     assert "增加真实排障练习" in prompt
 
 
+def test_prompt_uses_uploaded_material_context() -> None:
+    prompt = build_syllabus_prompt(
+        workspace(),
+        [],
+        language="zh",
+        mode="full",
+        guidance=None,
+        knowledge_context="[资料1] 教材第 12 页\n事务需要满足原子性。",
+    )
+
+    assert "Uploaded learning materials" in prompt
+    assert "事务需要满足原子性" in prompt
+
+
 def test_parser_accepts_delimited_lines_and_rejects_empty_output() -> None:
     parsed = parse_syllabus_response(
         "基础 :: 事务边界 :: 能识别事务边界\n===KUAI:END==="
@@ -124,13 +139,17 @@ async def test_model_gateway_requires_server_api_key() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_syllabus_persists_model_result() -> None:
+async def test_generate_syllabus_persists_model_result(monkeypatch: pytest.MonkeyPatch) -> None:
     session = FakeGenerationSession(workspace())
     gateway = FakeGateway(
         "基础 :: 事务边界 :: 能识别事务边界\n"
         "实践 :: 死锁排查 :: 能完成一次排障\n"
         "===KUAI:END==="
     )
+    async def fake_search(*_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(learning_content_route, "search_knowledge", fake_search)
 
     result = await generate_syllabus(
         "workspace-1",
@@ -138,6 +157,7 @@ async def test_generate_syllabus_persists_model_result() -> None:
         CurrentUser(subject="identity-1"),
         session,  # type: ignore[arg-type]
         gateway,
+        Settings(app_env="test"),
     )
 
     assert [item.order_index for item in result] == [1, 2]

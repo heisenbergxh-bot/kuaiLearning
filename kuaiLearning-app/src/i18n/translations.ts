@@ -249,6 +249,7 @@ export const translations = {
   onboardingReviewWhy: { zh: '学习动机', en: 'Motivation' },
   onboardingReviewSuccess: { zh: '成功标志', en: 'Success indicators' },
   onboardingReviewConstraints: { zh: '限制条件', en: 'Constraints' },
+  onboardingReviewMaterials: { zh: '学习资料', en: 'Learning materials' },
   onboardingCreate: { zh: '创建并开始', en: 'Create & Start' },
   onboardingCreating: { zh: '创建中...', en: 'Creating...' },
   next: { zh: '下一步', en: 'Next' },
@@ -265,6 +266,7 @@ export const translations = {
   mcAskSuccess: { zh: '学成之后，你希望自己能做到什么？（可多选，也可自己补充）', en: 'When you’ve succeeded, what will you be able to do? (pick any, or add your own)' },
   mcAskConstraints: { zh: '有什么限制或偏好我需要知道的吗？比如时间、基础、学习方式。', en: 'Any constraints or preferences I should know? e.g. time, prior level, learning style.' },
   mcAskOutOfScope: { zh: '最后，有没有暂时不想涉及的内容？没有就跳过。', en: 'Finally — anything you’d rather NOT cover for now? Skip if none.' },
+  mcAskMaterials: { zh: '你有教材、讲义或题库吗？现在上传后，我会优先依据这些资料规划课程。也可以暂时跳过。', en: 'Do you have textbooks, notes, or question banks? Upload them now and I will use them to plan your course. You can also skip this step.' },
   mcAskSummary: { zh: '太好了，这是我整理的学习目标：', en: 'Perfect — here’s the learning mission I’ve put together:' },
   mcContinue: { zh: '继续', en: 'Continue' },
   mcCreate: { zh: '✓ 完成并创建工作区', en: '✓ Create workspace' },
@@ -272,6 +274,16 @@ export const translations = {
   mcTopicPlaceholder: { zh: '输入你想学的主题...', en: 'Type a topic you want to learn...' },
   mcWhyPlaceholder: { zh: '说说你的动机...', en: 'Tell me your motivation...' },
   mcOutOfScopePlaceholder: { zh: '暂不涉及的内容...', en: 'Topics to skip for now...' },
+  mcChooseMaterials: { zh: '选择学习资料', en: 'Choose learning materials' },
+  mcMaterialHint: { zh: '支持 PDF / TXT / Markdown，可多选，单文件最大 200MB', en: 'PDF / TXT / Markdown, multiple files, up to 200MB each' },
+  mcMaterialTypeError: { zh: '仅支持 PDF、TXT 和 Markdown 文件', en: 'Only PDF, TXT, and Markdown files are supported' },
+  mcMaterialSizeError: { zh: '存在超过 200MB 的文件，已跳过', en: 'A file larger than 200MB was skipped' },
+  mcContinueWithMaterials: { zh: '使用这些资料', en: 'Use these materials' },
+  mcUploadingMaterial: { zh: '正在上传资料 {current}/{total}…', en: 'Uploading material {current}/{total}…' },
+  sourceTypeCore: { zh: '核心教材', en: 'Core material' },
+  sourceTypeSupplementary: { zh: '补充资料', en: 'Supplementary' },
+  sourceTypeExam: { zh: '题库/考试', en: 'Exam material' },
+  sourceTypeNotes: { zh: '个人笔记', en: 'Personal notes' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings, get_settings
 from app.core.current_user import CurrentUser, CurrentUserDependency
 from app.db.session import get_db_session
 from app.models import LearningWorkspace, Lesson, SyllabusItem
@@ -14,11 +15,13 @@ from app.schemas import (
     SyllabusItemWrite,
 )
 from app.schemas.learning_content import SyllabusGenerateRequest
+from app.services.knowledge import search_knowledge
 from app.services.model_gateway import ModelGatewayDependency, ModelGatewayError
 from app.services.syllabus_generation import build_syllabus_prompt, parse_syllabus_response
 
 router = APIRouter(prefix="/workspaces/{workspace_id}", tags=["learning-content"])
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 async def _require_workspace(
@@ -124,6 +127,7 @@ async def generate_syllabus(
     user: CurrentUserDependency,
     session: DbSession,
     model_gateway: ModelGatewayDependency,
+    settings: AppSettings,
 ) -> list[SyllabusItem]:
     workspace = await session.scalar(
         select(LearningWorkspace).where(
@@ -147,12 +151,30 @@ async def generate_syllabus(
         if payload.mode == "replan"
         else []
     )
+    workspace_payload = workspace.content_payload or {}
+    mission = workspace_payload.get("mission") or {}
+    search_query = " ".join(
+        value
+        for value in [mission.get("topic"), mission.get("why"), workspace.learning_goal]
+        if value
+    )
+    hits = (
+        await search_knowledge(workspace_id, search_query[:500], 10, settings)
+        if search_query
+        else []
+    )
+    knowledge_context = "\n\n".join(
+        f"[资料{index}] {hit.source_title}"
+        f"{f'，第 {hit.page_number} 页' if hit.page_number else ''}\n{hit.content}"
+        for index, hit in enumerate(hits, start=1)
+    )
     prompt = build_syllabus_prompt(
         workspace,
         kept,
         language=payload.language,
         mode=payload.mode,
         guidance=payload.guidance,
+        knowledge_context=knowledge_context,
     )
     try:
         raw_response = await model_gateway.complete(

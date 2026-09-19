@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   deleteKnowledgeSource,
   listKnowledgeSources,
@@ -15,6 +15,8 @@ import type { Resource } from '../types';
 
 export function ResourcesPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [resources, setResources] = useState<Resource[]>([]);
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,12 +97,42 @@ export function ResourcesPage() {
   };
 
   const readyCount = sources.filter(source => source.status === 'ready').length;
+  const processingCount = sources.filter(source => source.status === 'pending' || source.status === 'processing').length;
+  const failedCount = sources.filter(source => source.status === 'failed').length;
+  const onboarding = searchParams.get('onboarding') === '1';
+  const uploadErrors = Number(searchParams.get('uploadErrors') || 0);
   const knowledge = resources.filter(resource => resource.type === 'knowledge');
   const wisdom = resources.filter(resource => resource.type === 'wisdom');
   if (loading) return <Loading />;
 
   return (
     <div className="fade-in max-w-3xl space-y-8">
+      {onboarding && (
+        <section className="rounded-xl border border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/30 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--color-text-heading)]">
+                {processingCount > 0
+                  ? (lang === 'zh' ? '工作区已创建，正在准备学习资料' : 'Workspace created — preparing materials')
+                  : (lang === 'zh' ? '学习资料已经准备好' : 'Learning materials are ready')}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                {processingCount > 0
+                  ? (lang === 'zh' ? `还有 ${processingCount} 份资料正在解析，完成后再生成学习路线，课程会更贴合原文。` : `${processingCount} material(s) are still processing. Generate the roadmap after they are ready.`)
+                  : (lang === 'zh' ? `已有 ${readyCount} 份资料可用于学习路线、课时生成和答疑。` : `${readyCount} material(s) can now ground the roadmap, lessons, and chat.`)}
+              </p>
+              {(uploadErrors > 0 || failedCount > 0) && <p className="mt-1 text-xs text-red-500">{lang === 'zh' ? `${uploadErrors + failedCount} 份资料未成功处理，可在下方重试或重新上传。` : `${uploadErrors + failedCount} material(s) need attention.`}</p>}
+            </div>
+            <button
+              onClick={() => navigate(`/workspace/${workspaceId}/lessons`)}
+              disabled={processingCount > 0 || readyCount === 0}
+              className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {lang === 'zh' ? '下一步：生成学习路线' : 'Next: generate roadmap'}
+            </button>
+          </div>
+        </section>
+      )}
       <section>
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
@@ -162,12 +194,15 @@ function Loading() {
 
 function SourceCard({ source, workspaceId, lang, onRefresh, onError }: { source: KnowledgeSource; workspaceId: string; lang: 'zh' | 'en'; onRefresh: () => Promise<void>; onError: (message: string) => void }) {
   const statusText: Record<string, string> = { pending: lang === 'zh' ? '等待解析' : 'Pending', processing: lang === 'zh' ? '解析与索引中' : 'Processing', ready: lang === 'zh' ? '可使用' : 'Ready', failed: lang === 'zh' ? '处理失败' : 'Failed' };
+  const sourceTypeText: Record<string, string> = lang === 'zh'
+    ? { core: '核心教材', supplementary: '补充资料', exam: '题库/考试', notes: '个人笔记', document: '学习资料' }
+    : { core: 'Core material', supplementary: 'Supplementary', exam: 'Exam material', notes: 'Personal notes', document: 'Learning material' };
   const run = async (action: () => Promise<unknown>) => { try { await action(); await onRefresh(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
   return <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] flex gap-3 items-start">
     <span className="text-xl">{source.original_filename.toLowerCase().endsWith('.pdf') ? '📕' : '📄'}</span>
     <div className="min-w-0 flex-1">
       <a href={`/api/v1/workspaces/${workspaceId}/knowledge/sources/${source.id}/download`} className="text-sm font-semibold text-[var(--color-text-heading)] hover:text-[var(--color-accent)]" target="_blank" rel="noreferrer">{source.title}</a>
-      <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]"><span>{formatBytes(source.byte_size)}</span><span>·</span><span className={source.status === 'failed' ? 'text-red-500' : source.status === 'ready' ? 'text-green-600' : 'text-amber-600'}>{statusText[source.status] || source.status}</span>{source.status === 'ready' && <><span>·</span><span>{source.chunk_count} {lang === 'zh' ? '个片段' : 'chunks'}</span></>}</div>
+      <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]"><span className="rounded bg-[var(--color-accent-light)] px-1.5 py-0.5 text-[var(--color-accent)]">{sourceTypeText[source.source_type] || source.source_type}</span><span>{formatBytes(source.byte_size)}</span><span>·</span><span className={source.status === 'failed' ? 'text-red-500' : source.status === 'ready' ? 'text-green-600' : 'text-amber-600'}>{statusText[source.status] || source.status}</span>{source.status === 'ready' && <><span>·</span><span>{source.chunk_count} {lang === 'zh' ? '个片段' : 'chunks'}</span></>}</div>
       {source.error_message && <p className="text-xs text-red-500 mt-1">{source.error_message}</p>}
     </div>
     <div className="flex gap-2 text-xs">{source.status === 'failed' && <button className="text-[var(--color-accent)]" onClick={() => void run(() => retryKnowledgeSource(workspaceId, source.id))}>{lang === 'zh' ? '重试' : 'Retry'}</button>}<button className="text-red-400" onClick={() => { if (confirm(lang === 'zh' ? '确定删除这份资料？' : 'Delete this source?')) void run(() => deleteKnowledgeSource(workspaceId, source.id)); }}>×</button></div>

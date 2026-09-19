@@ -35,10 +35,12 @@ export async function uploadKnowledgeSource(
   workspaceId: string,
   file: File,
   title?: string,
+  sourceType: 'core' | 'supplementary' | 'exam' | 'notes' = 'core',
 ): Promise<KnowledgeSource> {
   const data = new FormData();
   data.append('file', file);
   if (title?.trim()) data.append('title', title.trim());
+  data.append('source_type', sourceType);
   const response = await fetch(`/api/v1/workspaces/${workspaceId}/knowledge/sources`, {
     method: 'POST',
     credentials: 'include',
