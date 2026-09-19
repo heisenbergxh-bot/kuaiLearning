@@ -15,6 +15,9 @@ dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
   "mcp>=1.13,<2",
+  "pymupdf>=1.25,<2",
+  "python-multipart>=0.0.20,<1",
+  "fastembed>=0.7,<1",
   "pydantic-settings>=2.7,<3",
   "PyJWT[crypto]>=2.10,<3",
   "sqlalchemy[asyncio]>=2.0.36,<3",
@@ -52,5 +55,6 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["agentscope", "agentscope.*"]
+module = ["agentscope", "agentscope.*", "fitz", "fitz.*"]
 follow_imports = "skip"
+ignore_missing_imports = true

@@ -100,6 +100,47 @@ class Lesson(IdMixin, TimestampMixin, Base):
     client_updated_at_ms: Mapped[int | None] = mapped_column(BigInteger)
 
 
+class KnowledgeSource(IdMixin, TimestampMixin, Base):
+    __tablename__ = "knowledge_sources"
+    __table_args__ = (
+        Index("ix_knowledge_source_workspace_status", "workspace_id", "status"),
+    )
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("learning_workspaces.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    owner_subject: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(32), default="document", nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(500), nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(200))
+    storage_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(1000))
+
+
+class KnowledgeChunk(IdMixin, TimestampMixin, Base):
+    __tablename__ = "knowledge_chunks"
+    __table_args__ = (
+        UniqueConstraint("source_id", "chunk_index", name="uq_knowledge_chunk_source_index"),
+        Index("ix_knowledge_chunk_workspace_source", "workspace_id", "source_id"),
+    )
+
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("learning_workspaces.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class SyllabusItem(IdMixin, TimestampMixin, Base):
     __tablename__ = "syllabus_items"
     __table_args__ = (

@@ -32,9 +32,22 @@ class Settings(BaseSettings):
     model_timeout_seconds: int = Field(default=180, ge=5, le=600)
     ai_config_admin_subjects: list[str] = Field(default_factory=list)
     ai_config_encryption_key: SecretStr = SecretStr("")
+    knowledge_upload_dir: str = "/opt/kuailearning/uploads"
+    knowledge_max_upload_bytes: int = Field(default=209_715_200, ge=1_048_576)
+    knowledge_chunk_chars: int = Field(default=700, ge=200, le=2000)
+    knowledge_chunk_overlap: int = Field(default=100, ge=0, le=500)
+    qdrant_url: str = "http://127.0.0.1:6333"
+    qdrant_collection: str = "kuailearning_knowledge"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_dimensions: int = Field(default=384, ge=32, le=4096)
+    meilisearch_url: str = "http://127.0.0.1:7700"
+    meilisearch_api_key: SecretStr = SecretStr("")
+    meilisearch_knowledge_index: str = "kuailearning_knowledge"
 
     @model_validator(mode="after")
     def reject_debug_auth_in_production(self) -> "Settings":
+        if self.knowledge_chunk_overlap >= self.knowledge_chunk_chars:
+            raise ValueError("KNOWLEDGE_CHUNK_OVERLAP must be smaller than KNOWLEDGE_CHUNK_CHARS")
         if self.app_env == "production" and self.auth_mode == "development":
             raise ValueError("AUTH_MODE=development is forbidden in production")
         if self.app_env == "production" and self.auth_mode == "external":

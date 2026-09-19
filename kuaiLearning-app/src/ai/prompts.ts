@@ -15,6 +15,7 @@ export function buildSyllabusPrompt(
   language: Language,
   mode: 'full' | 'replan',
   userRequest?: string,
+  knowledgeContext = '',
 ): string {
   const lang = language === 'zh' ? 'Chinese (Simplified Chinese / 简体中文)' : 'English';
   const m = workspace.mission;
@@ -40,6 +41,10 @@ export function buildSyllabusPrompt(
     ? `\n## The student's adjustment request (IMPORTANT — follow this when planning)\n${userRequest}`
     : '';
 
+  const knowledgeBlock = knowledgeContext
+    ? `\n## User-provided source material\nUse this material to decide coverage and terminology. Do not invent claims beyond it.\n${knowledgeContext}\n`
+    : '';
+
   return `You are an expert curriculum designer. Design a learning roadmap (syllabus) for one student, grounded entirely in their mission.
 
 ## Language Requirement (CRITICAL)
@@ -51,7 +56,7 @@ ALL values (module names, lesson titles, descriptions) MUST be written in **${la
 **Success looks like**: ${m.successLooksLike.join('; ')}
 **Constraints**: ${m.constraints || 'None specified'}
 **Out of scope**: ${m.outOfScope || 'None specified'}
-${learnedBlock}${keptBlock}${requestBlock}
+${learnedBlock}${keptBlock}${knowledgeBlock}${requestBlock}
 
 ## Your Task
 Produce an ordered course roadmap that takes the student from their current point to their mission's "success looks like":
@@ -94,6 +99,7 @@ export function buildLessonPrompt(
   userRequest?: string,
   syllabus: SyllabusItem[] = [],
   targetItem?: SyllabusItem,
+  knowledgeContext = '',
 ): string {
   const lessonNumbers = lessons.map(l => l.number);
   const nextNumber = lessonNumbers.length > 0 ? Math.max(...lessonNumbers) + 1 : 1;
@@ -140,6 +146,10 @@ export function buildLessonPrompt(
 
   const targetBlock = targetItem
     ? `\n## The lesson to create now\nTeach exactly this roadmap item: **${targetItem.title}** — ${targetItem.description}\nKeep it scoped to this; later items will cover the rest.`
+    : '';
+
+  const knowledgeBlock = knowledgeContext
+    ? `\n## User-provided source material (PRIMARY GROUNDING)\nBase factual claims on the excerpts below. Cite them inline as [资料1], [资料2], etc. Preserve page numbers and never invent a citation. If the excerpts do not support a claim, either omit it or clearly label it as general background.\n\n${knowledgeContext}\n`
     : '';
 
   return `You are an expert teacher creating a single, self-contained HTML lesson for a student.
@@ -274,7 +284,7 @@ ${lessons.length > 0 ? lessons.map(l => `Lesson ${l.number}: "${l.title}"`).join
 
 ## Glossary (canonical terms — use these exactly)
 ${glossBlock}
-${syllabusBlock}${targetBlock}
+${syllabusBlock}${targetBlock}${knowledgeBlock}
 ${userRequest ? `\n## Student's specific request\n${userRequest}` : ''}
 
 # Now produce Lesson ${nextNumber}
@@ -394,6 +404,7 @@ export function buildChatPrompt(
   lessonTitle: string,
   lessonContent: string,
   language: Language,
+  knowledgeContext = '',
 ): string {
   return `You are a patient, encouraging teacher helping a student understand a lesson they just completed.
 
@@ -403,6 +414,8 @@ The student's language is: **${language === 'zh' ? 'Chinese (Simplified Chinese)
 ## The Lesson
 **Title**: ${lessonTitle}
 **Content**: ${lessonContent.slice(0, 8000)}
+
+${knowledgeContext ? `## Relevant user-provided sources\nUse and cite these excerpts when they answer the question.\n${knowledgeContext}` : ''}
 
 ## Your Role
 - Answer the student's questions clearly and concisely.

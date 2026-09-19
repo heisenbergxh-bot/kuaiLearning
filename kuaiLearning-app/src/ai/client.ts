@@ -10,6 +10,7 @@ import {
 import { db } from '../db';
 import { readChatCompletionStream } from './streaming';
 import { fetchCompletion } from './request';
+import { knowledgeContext, searchKnowledge } from '../api/knowledge';
 
 type AIStreamCallback = (chunk: string) => void;
 
@@ -29,7 +30,14 @@ export async function generateSyllabus(
         .sort((a, b) => a.order - b.order)
     : [];
 
-  const systemPrompt = buildSyllabusPrompt(workspace, learningRecords, keepItems, settings.language, mode, userRequest);
+  const hits = await searchKnowledge(
+    workspaceId,
+    `${workspace.mission.topic} ${workspace.mission.why}`.trim(),
+    6,
+  ).catch(() => []);
+  const systemPrompt = buildSyllabusPrompt(
+    workspace, learningRecords, keepItems, settings.language, mode, userRequest, knowledgeContext(hits),
+  );
 
   const response = await fetchCompletion(workspaceId, {
     method: 'POST',
@@ -77,7 +85,15 @@ export async function generateLesson(
   const syllabus = (await db.syllabusItems.where('workspaceId').equals(workspaceId).toArray()).sort((a, b) => a.order - b.order);
   const targetItem = targetItemId ? syllabus.find(s => s.id === targetItemId) : undefined;
 
-  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
+  const hits = await searchKnowledge(
+    workspaceId,
+    `${targetItem?.title || workspace.mission.topic} ${targetItem?.description || userRequest || ''}`.trim(),
+    8,
+  ).catch(() => []);
+  const systemPrompt = buildLessonPrompt(
+    workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest,
+    syllabus, targetItem, knowledgeContext(hits),
+  );
 
   const response = await fetchCompletion(workspaceId, {
     method: 'POST',
@@ -124,7 +140,15 @@ export async function generateLessonStream(
   const syllabus = (await db.syllabusItems.where('workspaceId').equals(workspaceId).toArray()).sort((a, b) => a.order - b.order);
   const targetItem = targetItemId ? syllabus.find(s => s.id === targetItemId) : undefined;
 
-  const systemPrompt = buildLessonPrompt(workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest, syllabus, targetItem);
+  const hits = await searchKnowledge(
+    workspaceId,
+    `${targetItem?.title || workspace.mission.topic} ${targetItem?.description || userRequest || ''}`.trim(),
+    8,
+  ).catch(() => []);
+  const systemPrompt = buildLessonPrompt(
+    workspace, lessons, learningRecords, glossaryTerms, settings.language, userRequest,
+    syllabus, targetItem, knowledgeContext(hits),
+  );
 
   const response = await fetchCompletion(workspaceId, {
     method: 'POST',
@@ -163,7 +187,10 @@ export async function chatWithAI(
   if (!lesson) throw new Error('Lesson not found');
   const workspaceId = lesson.workspaceId;
 
-  const systemPrompt = buildChatPrompt(lesson.title, lesson.htmlContent, settings.language);
+  const hits = await searchKnowledge(workspaceId, userMessage, 6).catch(() => []);
+  const systemPrompt = buildChatPrompt(
+    lesson.title, lesson.htmlContent, settings.language, knowledgeContext(hits),
+  );
 
   // Build conversation history (last 10 messages to stay within context)
   const recentMessages = messages.slice(-10);
