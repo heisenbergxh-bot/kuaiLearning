@@ -3,6 +3,7 @@ import type { Workspace } from '../types';
 import { db, deleteLocalWorkspaceData, generateId } from '../db';
 import { deleteRemoteWorkspace, upsertRemoteWorkspace } from '../api/workspaces';
 import { synchronizeWorkspaceCache } from '../api/workspaceSync';
+import { ApiError } from '../api/http';
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -61,6 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ syncError: null });
     } catch (reason) {
       set({ syncError: syncErrorMessage(reason) });
+      if (reason instanceof ApiError && reason.status === 409) throw reason;
     }
     return ws;
   },
@@ -94,6 +96,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ syncError: null });
     } catch (reason) {
       set({ syncError: syncErrorMessage(reason) });
+      if (reason instanceof ApiError && reason.status === 409) throw reason;
     }
   },
 

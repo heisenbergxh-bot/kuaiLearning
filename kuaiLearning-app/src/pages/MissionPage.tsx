@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useTranslation } from '../i18n/useTranslation';
 import { MissionChat } from '../components/MissionChat';
 import type { Mission as MissionType } from '../types';
+import { ApiError } from '../api/http';
 
 export function MissionPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const { workspaces, activeId, loadWorkspaces, updateMission } = useWorkspaceStore();
+  const navigate = useNavigate();
+  const { workspaces, activeId, loadWorkspaces, createWorkspace, updateMission } = useWorkspaceStore();
   const workspace = workspaces.find(w => w.id === activeId);
   const { t } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
@@ -18,6 +20,9 @@ export function MissionPage() {
   const [constraints, setConstraints] = useState('');
   const [outOfScope, setOutOfScope] = useState('');
   const [newSuccessItem, setNewSuccessItem] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [deletedConflict, setDeletedConflict] = useState(false);
 
   useEffect(() => {
     loadWorkspaces();
@@ -61,15 +66,51 @@ export function MissionPage() {
     );
   }
 
-  const handleSave = async () => {
-    const mission: MissionType = {
+  const currentMission = (): MissionType => ({
       topic,
       why,
       successLooksLike: successItems.filter(Boolean),
       constraints,
       outOfScope,
-    };
-    await updateMission(workspace.id, mission);
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMessage('');
+    setDeletedConflict(false);
+    try {
+      await updateMission(workspace.id, currentMission());
+      setSaveMessage(t('missionSaved'));
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409) {
+        setDeletedConflict(true);
+        setSaveMessage(t('workspaceDeletedConflict'));
+      } else {
+        setSaveMessage(reason instanceof Error ? reason.message : t('missionSaveFailed'));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAsCopy = async () => {
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const copy = await createWorkspace(`${workspace.name}${t('workspaceCopySuffix')}`);
+      await updateMission(copy.id, currentMission());
+      await loadWorkspaces();
+      navigate(`/workspace/${copy.id}/mission`, { replace: true });
+    } catch (reason) {
+      setSaveMessage(reason instanceof Error ? reason.message : t('missionSaveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLeaveDeletedWorkspace = async () => {
+    await loadWorkspaces();
+    navigate('/', { replace: true });
   };
 
   const addSuccessItem = () => {
@@ -185,10 +226,22 @@ export function MissionPage() {
 
         <button
           onClick={handleSave}
-          className="w-full px-4 py-2.5 bg-[var(--color-accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+          disabled={saving}
+          className="w-full px-4 py-2.5 bg-[var(--color-accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          {t('saveMission')}
+          {saving ? t('saving') : t('saveMission')}
         </button>
+        {saveMessage && (
+          <div className={`rounded-lg border p-3 text-sm ${deletedConflict ? 'border-amber-400/50 bg-amber-50 text-amber-800' : 'border-green-500/30 bg-green-500/10 text-green-700'}`} role="status">
+            <p>{saveMessage}</p>
+            {deletedConflict && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={() => void handleSaveAsCopy()} disabled={saving} className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">{t('saveAsNewWorkspace')}</button>
+                <button onClick={() => void handleLeaveDeletedWorkspace()} disabled={saving} className="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs font-medium disabled:opacity-50">{t('backToActiveWorkspace')}</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
