@@ -57,7 +57,9 @@ interface LessonRendererProps {
 
 export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const onQuizAnswerRef = useRef(onQuizAnswer);
   const [height, setHeight] = useState(600);
+  onQuizAnswerRef.current = onQuizAnswer;
 
   const setupQuizListeners = useCallback((doc: Document) => {
     const quizBlocks = doc.querySelectorAll<HTMLElement>('.quiz-block');
@@ -101,11 +103,11 @@ export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProp
             feedbackWrong.classList.add('show');
           }
 
-          onQuizAnswer?.(quizId, isCorrect);
+          onQuizAnswerRef.current?.(quizId, isCorrect);
         });
       });
     });
-  }, [onQuizAnswer]);
+  }, []);
 
   useEffect(() => {
     const iframe = iframeRef.current;
