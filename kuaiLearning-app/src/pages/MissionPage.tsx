@@ -33,10 +33,6 @@ export function MissionPage() {
   ));
 
   useEffect(() => {
-    loadWorkspaces();
-  }, [loadWorkspaces]);
-
-  useEffect(() => {
     if (workspace) {
       setTopic(workspace.mission.topic);
       setWhy(workspace.mission.why);

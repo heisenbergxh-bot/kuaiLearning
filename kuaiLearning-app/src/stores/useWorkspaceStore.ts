@@ -9,6 +9,7 @@ interface WorkspaceState {
   workspaces: Workspace[];
   activeId: string | null;
   loading: boolean;
+  initialized: boolean;
   syncError: string | null;
 
   loadWorkspaces: () => Promise<void>;
@@ -23,24 +24,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeId: null,
   loading: false,
+  initialized: false,
   syncError: null,
 
   loadWorkspaces: async () => {
-    set({ loading: true });
+    // Never expose the shared browser cache before the server confirms which
+    // workspaces belong to the currently authenticated account.
+    set({ workspaces: [], activeId: null, loading: true, initialized: false, syncError: null });
     const localWorkspaces = await db.workspaces.orderBy('updatedAt').reverse().toArray();
-    set({
-      workspaces: localWorkspaces,
-      activeId: get().activeId || localWorkspaces[0]?.id || null,
-    });
     try {
       const workspaces = await synchronizeWorkspaceCache(localWorkspaces);
       const previousActiveId = get().activeId;
       const activeId = workspaces.some(item => item.id === previousActiveId)
         ? previousActiveId
         : workspaces[0]?.id || null;
-      set({ workspaces, activeId, loading: false, syncError: null });
+      set({ workspaces, activeId, loading: false, initialized: true, syncError: null });
     } catch (reason) {
-      set({ loading: false, syncError: syncErrorMessage(reason) });
+      set({ workspaces: [], activeId: null, loading: false, initialized: true, syncError: syncErrorMessage(reason) });
     }
   },
 

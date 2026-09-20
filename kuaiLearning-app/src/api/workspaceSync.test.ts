@@ -63,19 +63,25 @@ beforeEach(async () => {
 });
 
 describe('workspace synchronization', () => {
-  it('imports a legacy local workspace when the server has no copy', async () => {
+  it('keeps an unclaimed local workspace private when the account has no server copy', async () => {
     vi.mocked(listRemoteWorkspaces).mockResolvedValue([]);
-    vi.mocked(upsertRemoteWorkspace).mockResolvedValue({
-      ...deletedRemote,
-      status: 'active',
-      title: localWorkspace.name,
-    });
+    await db.workspaces.add(localWorkspace);
+
+    const result = await synchronizeWorkspaceCache([localWorkspace]);
+
+    expect(upsertRemoteWorkspace).not.toHaveBeenCalled();
+    expect(result).toEqual([]);
+    await expect(db.workspaces.get(localWorkspace.id)).resolves.toBeDefined();
+  });
+
+  it('uploads a newer local copy only after the server confirms ownership', async () => {
+    vi.mocked(listRemoteWorkspaces).mockResolvedValue([{ ...deletedRemote, status: 'active', client_updated_at_ms: 1000 }]);
+    vi.mocked(upsertRemoteWorkspace).mockResolvedValue({ ...deletedRemote, status: 'active', title: localWorkspace.name });
 
     const result = await synchronizeWorkspaceCache([localWorkspace]);
 
     expect(upsertRemoteWorkspace).toHaveBeenCalledWith(localWorkspace);
     expect(result).toHaveLength(1);
-    await expect(db.workspaces.get(localWorkspace.id)).resolves.toBeDefined();
   });
 
   it('honors a server tombstone instead of resurrecting a stale browser copy', async () => {

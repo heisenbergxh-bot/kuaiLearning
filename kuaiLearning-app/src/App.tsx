@@ -14,6 +14,7 @@ import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { AuthGate } from './auth/AuthGate';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { applyTheme, darkModeQuery } from './lib/theme';
+import { WorkspaceAccessGate } from './components/WorkspaceAccessGate';
 
 function AppContent() {
   const { loadWorkspaces } = useWorkspaceStore();
@@ -43,14 +44,16 @@ export default function App() {
           <Route element={<AppContent />}>
             <Route path="/" element={<RootRedirect />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/workspace/:workspaceId/mission" element={<MissionPage />} />
-            <Route path="/workspace/:workspaceId/lessons" element={<LessonsPage />} />
-            <Route path="/workspace/:workspaceId/lesson/:lessonId" element={<LessonDetailPage />} />
-            <Route path="/workspace/:workspaceId/quiz" element={<QuizBankPage />} />
-            <Route path="/workspace/:workspaceId/references" element={<ReferencesPage />} />
-            <Route path="/workspace/:workspaceId/records" element={<LearningRecordsPage />} />
-            <Route path="/workspace/:workspaceId/glossary" element={<GlossaryPage />} />
-            <Route path="/workspace/:workspaceId/resources" element={<ResourcesPage />} />
+            <Route path="/workspace/:workspaceId" element={<WorkspaceAccessGate />}>
+              <Route path="mission" element={<MissionPage />} />
+              <Route path="lessons" element={<LessonsPage />} />
+              <Route path="lesson/:lessonId" element={<LessonDetailPage />} />
+              <Route path="quiz" element={<QuizBankPage />} />
+              <Route path="references" element={<ReferencesPage />} />
+              <Route path="records" element={<LearningRecordsPage />} />
+              <Route path="glossary" element={<GlossaryPage />} />
+              <Route path="resources" element={<ResourcesPage />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
@@ -60,7 +63,10 @@ export default function App() {
 }
 
 function RootRedirect() {
-  const { workspaces, activeId } = useWorkspaceStore();
+  const { workspaces, activeId, initialized } = useWorkspaceStore();
+  if (!initialized) {
+    return <div className="py-16 text-center text-sm text-[var(--color-text-muted)]">正在加载当前账号的工作区…</div>;
+  }
   const target = activeId || workspaces[0]?.id;
   if (target) {
     return <Navigate to={`/workspace/${target}/mission`} replace />;
