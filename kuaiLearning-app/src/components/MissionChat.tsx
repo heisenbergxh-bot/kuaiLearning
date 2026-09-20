@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
 import { useTranslation } from '../i18n/useTranslation';
@@ -82,8 +83,15 @@ export function MissionChat({ open, onClose }: MissionChatProps) {
   }, [open]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [open]);
 
   if (!open) return null;
 
@@ -240,10 +248,13 @@ export function MissionChat({ open, onClose }: MissionChatProps) {
   const ghostBtn =
     'px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-accent-light)] transition-colors';
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4 backdrop-blur-[2px]"
       onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('mcTitle')}
     >
       <div className="w-full max-w-lg bg-[var(--color-bg-card)] rounded-2xl shadow-2xl flex flex-col max-h-[88vh]">
         {/* Header */}
@@ -447,6 +458,7 @@ export function MissionChat({ open, onClose }: MissionChatProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
