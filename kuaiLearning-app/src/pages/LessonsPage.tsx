@@ -10,6 +10,7 @@ import { db } from '../db';
 import { generateRemoteSyllabus, syllabusItemFromRemote } from '../api/learningContent';
 import { synchronizeLearningContent } from '../api/learningContentSync';
 import { listKnowledgeSources, type KnowledgeSource } from '../api/knowledge';
+import { AppIcon, type AppIconName } from '../components/AppIcon';
 
 export function LessonsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -128,12 +129,14 @@ export function LessonsPage() {
   const otherLessons = syllabus.length ? lessons.filter(l => !syllabusLessonIds.has(l.id)) : lessons;
 
   return (
-    <div className="fade-in max-w-2xl">
+    <div className="fade-in max-w-4xl">
       <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('lessonsTitle')}</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-6">{t('lessonsDesc')}</p>
 
       <CourseSourcesPanel
         sources={knowledgeSources}
+        roadmapCount={syllabus.length}
+        lessonCount={lessons.length}
         lang={lang}
         onManage={() => navigate(`/workspace/${workspaceId}/resources`)}
       />
@@ -217,7 +220,7 @@ export function LessonsPage() {
   );
 }
 
-function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSource[]; lang: 'zh' | 'en'; onManage: () => void }) {
+function CourseSourcesPanel({ sources, roadmapCount, lessonCount, lang, onManage }: { sources: KnowledgeSource[]; roadmapCount: number; lessonCount: number; lang: 'zh' | 'en'; onManage: () => void }) {
   const ready = sources.filter(source => source.status === 'ready');
   const processing = sources.filter(source => source.status === 'pending' || source.status === 'processing');
   const labels: Record<string, string> = lang === 'zh'
@@ -225,8 +228,8 @@ function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSou
     : { core: 'Core', supplementary: 'Supplementary', exam: 'Exam', notes: 'Notes', document: 'Material' };
 
   return (
-    <div className="mb-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="mb-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-[var(--color-text-heading)]">{lang === 'zh' ? '课程依据' : 'Course materials'}</h3>
           <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
@@ -235,9 +238,15 @@ function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSou
               : (lang === 'zh' ? '还没有可用资料，可以上传教材后再生成学习路线。' : 'No ready materials. Upload a source before generating the roadmap.')}
           </p>
         </div>
-        <button onClick={onManage} className="shrink-0 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-xs hover:bg-[var(--color-accent-light)]">
+        <button onClick={onManage} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] px-3 py-2 text-xs font-medium hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-light)]">
+          <AppIcon name={sources.length ? 'settings' : 'upload'} className="h-3.5 w-3.5" />
           {lang === 'zh' ? (sources.length ? '管理资料' : '上传资料') : (sources.length ? 'Manage' : 'Upload')}
         </button>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <LearningStep icon="file" label={lang === 'zh' ? '1. 学习资料' : '1. Materials'} value={ready.length ? `${ready.length} ${lang === 'zh' ? '份可用' : 'ready'}` : (lang === 'zh' ? '待上传' : 'Not ready')} active={ready.length > 0} />
+        <LearningStep icon="route" label={lang === 'zh' ? '2. 学习路线' : '2. Roadmap'} value={roadmapCount ? `${roadmapCount} ${lang === 'zh' ? '个课时' : 'items'}` : (lang === 'zh' ? '待生成' : 'Not generated')} active={roadmapCount > 0} />
+        <LearningStep icon="book" label={lang === 'zh' ? '3. 学习课程' : '3. Lessons'} value={lessonCount ? `${lessonCount} ${lang === 'zh' ? '节已生成' : 'generated'}` : (lang === 'zh' ? '待生成' : 'Not generated')} active={lessonCount > 0} />
       </div>
       {ready.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -245,6 +254,15 @@ function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSou
         </div>
       )}
       {processing.length > 0 && <p className="mt-2 text-xs text-[var(--color-warning)]">{lang === 'zh' ? `${processing.length} 份资料正在解析，完成前不会生成学习路线。` : `${processing.length} material(s) are processing. Roadmap generation will wait.`}</p>}
+    </div>
+  );
+}
+
+function LearningStep({ icon, label, value, active }: { icon: AppIconName; label: string; value: string; active: boolean }) {
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${active ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/35' : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)]'}`}>
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-[var(--color-accent)] text-white' : 'bg-[var(--color-bg-card)] text-[var(--color-text-muted)]'}`}><AppIcon name={icon} className="h-4 w-4" /></div>
+      <div className="min-w-0"><p className="truncate text-xs font-medium text-[var(--color-text-heading)]">{label}</p><p className="truncate text-[11px] text-[var(--color-text-muted)]">{value}</p></div>
     </div>
   );
 }

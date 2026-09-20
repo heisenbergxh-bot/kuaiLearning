@@ -37,7 +37,7 @@ function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
         {workspaces.map(workspace => (
           <div key={workspace.id} className="group flex items-center gap-1">
             <button type="button" onClick={() => setActive(workspace.id)} className={`min-w-0 flex-1 truncate rounded-lg px-2.5 py-2 text-left text-sm transition-colors ${workspace.id === activeId ? 'bg-[var(--color-accent-light)] font-medium text-[var(--color-accent)]' : 'text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]'}`}>{workspace.name}</button>
-            <button type="button" onClick={() => handleDelete(workspace)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-muted)] opacity-0 transition-all hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] focus:opacity-100 group-hover:opacity-100" title={t('delete')} aria-label={`${t('delete')} ${workspace.name}`}>
+            <button type="button" onClick={() => handleDelete(workspace)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-muted)] opacity-100 transition-all hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)] sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100" title={t('delete')} aria-label={`${t('delete')} ${workspace.name}`}>
               <AppIcon name="trash" className="h-3.5 w-3.5" />
             </button>
           </div>

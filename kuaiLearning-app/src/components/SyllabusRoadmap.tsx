@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from '../i18n/useTranslation';
 import type { SyllabusItem, Lesson } from '../types';
+import { AppIcon } from './AppIcon';
 
 type ItemStatus = 'planned' | 'generated' | 'completed';
 
@@ -40,8 +41,8 @@ export function SyllabusRoadmap({
   // Empty state — no syllabus yet.
   if (items.length === 0) {
     return (
-      <div className="mb-6 p-5 rounded-xl border border-dashed border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/30 text-center">
-        <p className="text-2xl mb-2">🗺️</p>
+      <div className="mb-6 rounded-2xl border border-dashed border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/30 p-6 text-center">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-accent)] text-white"><AppIcon name="route" className="h-5 w-5" /></div>
         <p className="text-sm font-medium text-[var(--color-text-heading)] mb-1">{t('noSyllabusYet')}</p>
         <p className="text-xs text-[var(--color-text-muted)] mb-3">{t('noSyllabusHint')}</p>
         <button
@@ -67,7 +68,7 @@ export function SyllabusRoadmap({
   };
 
   return (
-    <div className="mb-6 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]">
+    <div className="mb-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div>
           <h3 className="text-sm font-semibold text-[var(--color-text-heading)]">{t('syllabusTitle')}</h3>
@@ -82,6 +83,10 @@ export function SyllabusRoadmap({
         >
           {t('replanSyllabus')}
         </button>
+      </div>
+
+      <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-[var(--color-bg-subtle)]" aria-label={t('completedCount', { done: String(doneCount), total: String(items.length) })}>
+        <div className="h-full rounded-full bg-[var(--color-success)] transition-[width]" style={{ width: `${Math.round((doneCount / items.length) * 100)}%` }} />
       </div>
 
       {replanOpen && (
@@ -123,7 +128,7 @@ export function SyllabusRoadmap({
               {items.filter(it => it.module === mod).map(it => {
                 const status = statusOf(it);
                 return (
-                  <div key={it.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-[var(--color-border)]">
+                  <div key={it.id} className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 transition-colors hover:border-[var(--color-accent-border)] sm:flex-row sm:items-start">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-[var(--color-text-heading)] font-medium">{it.title}</span>
@@ -135,14 +140,14 @@ export function SyllabusRoadmap({
                       <button
                         onClick={() => onGenerateItem(it)}
                         disabled={busy}
-                        className="shrink-0 px-2.5 py-1 rounded-md border border-[var(--color-accent-border)] text-xs text-[var(--color-accent)] hover:bg-[var(--color-accent-light)] transition-colors disabled:opacity-50"
+                        className="shrink-0 rounded-lg border border-[var(--color-accent-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-accent)] transition-colors hover:bg-[var(--color-accent-light)] disabled:opacity-50"
                       >
                         {t('generateThisLesson')}
                       </button>
                     ) : (
                       <button
                         onClick={() => it.lessonId && onOpenLesson(it.lessonId, 'lesson')}
-                        className="shrink-0 px-2.5 py-1 rounded-md border border-[var(--color-border)] text-xs text-[var(--color-text)] hover:bg-[var(--color-accent-light)] transition-colors"
+                        className="shrink-0 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-accent-light)]"
                       >
                         {t('viewLesson')}
                       </button>

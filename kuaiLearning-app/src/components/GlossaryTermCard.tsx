@@ -31,7 +31,7 @@ export function GlossaryTermCard({ term, onDelete }: GlossaryTermCardProps) {
         {onDelete && (
           <button
             onClick={() => onDelete(term.id)}
-            className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 text-xs text-[var(--color-danger)] px-1 transition-opacity"
+            className="shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 text-xs text-[var(--color-danger)] px-1 transition-opacity"
             aria-label={t('delete')}
           >
             ×

@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 export type AppIconName =
   | 'target' | 'book' | 'brain' | 'file' | 'glossary' | 'notes' | 'resources'
   | 'settings' | 'plus' | 'trash' | 'chevron' | 'panel' | 'menu' | 'close'
-  | 'sun' | 'moon' | 'monitor' | 'logout' | 'user' | 'sparkles' | 'warning';
+  | 'sun' | 'moon' | 'monitor' | 'logout' | 'user' | 'sparkles' | 'warning'
+  | 'upload' | 'search' | 'refresh' | 'check' | 'route';
 
 interface AppIconProps {
   name: AppIconName;
@@ -33,6 +34,11 @@ const paths: Record<AppIconName, ReactNode> = {
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
   sparkles: <><path d="m12 3-1.2 3.3L7.5 7.5l3.3 1.2L12 12l1.2-3.3 3.3-1.2-3.3-1.2L12 3ZM5 14l-.8 2.2L2 17l2.2.8L5 20l.8-2.2L8 17l-2.2-.8L5 14ZM19 13l-.7 1.8-1.8.7 1.8.7L19 18l.7-1.8 1.8-.7-1.8-.7L19 13Z"/></>,
   warning: <><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></>,
+  upload: <><path d="M12 16V4M8 8l4-4 4 4"/><path d="M5 21h14a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2"/></>,
+  search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+  refresh: <><path d="M20 7h-5V2"/><path d="M20 7a9 9 0 1 0 2 8"/></>,
+  check: <path d="m5 12 4 4L19 6"/>,
+  route: <><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M6 17V9a4 4 0 0 1 4-4h6M12 19h4a2 2 0 0 0 2-2v-4"/></>,
 };
 
 export function AppIcon({ name, className = 'h-4 w-4', strokeWidth = 1.8 }: AppIconProps) {

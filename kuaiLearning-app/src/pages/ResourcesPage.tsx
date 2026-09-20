@@ -12,6 +12,7 @@ import {
 import { db, generateId } from '../db';
 import { useTranslation } from '../i18n/useTranslation';
 import type { Resource } from '../types';
+import { AppIcon } from '../components/AppIcon';
 
 export function ResourcesPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -106,10 +107,10 @@ export function ResourcesPage() {
   if (loading) return <Loading />;
 
   return (
-    <div className="fade-in max-w-3xl space-y-8">
+    <div className="fade-in max-w-4xl space-y-8">
       {onboarding && (
         <section className="rounded-xl border border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/30 p-4">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[var(--color-text-heading)]">
                 {processingCount > 0
@@ -126,21 +127,22 @@ export function ResourcesPage() {
             <button
               onClick={() => navigate(`/workspace/${workspaceId}/lessons`)}
               disabled={processingCount > 0 || readyCount === 0}
-              className="shrink-0 px-4 py-2 rounded-lg bg-[var(--color-accent)] text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <AppIcon name="route" className="h-4 w-4" />
               {lang === 'zh' ? '下一步：生成学习路线' : 'Next: generate roadmap'}
             </button>
           </div>
         </section>
       )}
       <section>
-        <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{lang === 'zh' ? '我的资料库' : 'My knowledge library'}</h2>
             <p className="text-sm text-[var(--color-text-muted)]">{lang === 'zh' ? '上传后，AI 会在规划课程、生成课程和答疑时自动检索并引用原文。' : 'Uploaded sources are retrieved and cited during planning, lessons, and chat.'}</p>
           </div>
-          <label className={`px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-accent)] text-white cursor-pointer hover:opacity-90 ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-            {uploading ? (lang === 'zh' ? '上传中…' : 'Uploading…') : (lang === 'zh' ? '上传资料' : 'Upload source')}
+          <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+            <AppIcon name="upload" className="h-4 w-4" />{uploading ? (lang === 'zh' ? '上传中…' : 'Uploading…') : (lang === 'zh' ? '上传资料' : 'Upload source')}
             <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.markdown,application/pdf,text/plain,text/markdown" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void handleUpload(file); }} />
           </label>
         </div>
@@ -151,7 +153,7 @@ export function ResourcesPage() {
             {readyCount > 0 && <span>· {readyCount} {lang === 'zh' ? '份可用资料' : 'ready'}</span>}
           </div>
           {sources.length === 0 ? (
-            <div className="text-center py-8 text-sm text-[var(--color-text-muted)]"><div className="text-3xl mb-2">📚</div>{lang === 'zh' ? '还没有上传资料' : 'No uploaded sources yet'}</div>
+            <div className="py-10 text-center text-sm text-[var(--color-text-muted)]"><div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-bg-subtle)]"><AppIcon name="file" className="h-5 w-5" /></div>{lang === 'zh' ? '还没有上传资料' : 'No uploaded sources yet'}</div>
           ) : (
             <div className="space-y-2">{sources.map(source => <SourceCard key={source.id} source={source} workspaceId={workspaceId!} lang={lang} onRefresh={loadResources} onError={setMessage} />)}</div>
           )}
@@ -159,9 +161,9 @@ export function ResourcesPage() {
 
         {readyCount > 0 && (
           <div className="mt-4 rounded-xl border border-[var(--color-border)] p-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void handleSearch(); }} placeholder={lang === 'zh' ? '试着搜索资料中的内容…' : 'Search inside your sources…'} className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30" />
-              <button onClick={() => void handleSearch()} disabled={searching || query.trim().length < 2} className="px-4 py-2 text-sm rounded-lg border border-[var(--color-accent-border)] text-[var(--color-accent)] disabled:opacity-50">{searching ? (lang === 'zh' ? '检索中…' : 'Searching…') : (lang === 'zh' ? '检索测试' : 'Test search')}</button>
+              <button onClick={() => void handleSearch()} disabled={searching || query.trim().length < 2} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--color-accent-border)] px-4 py-2 text-sm text-[var(--color-accent)] disabled:opacity-50"><AppIcon name="search" className="h-4 w-4" />{searching ? (lang === 'zh' ? '检索中…' : 'Searching…') : (lang === 'zh' ? '检索测试' : 'Test search')}</button>
             </div>
             {hits.length > 0 && <div className="mt-4 space-y-3">{hits.map((hit, index) => <div key={hit.chunk_id} className="text-sm border-l-2 border-[var(--color-accent-border)] pl-3"><div className="font-medium text-[var(--color-text-heading)]">{index + 1}. {hit.source_title}{hit.page_number ? ` · ${lang === 'zh' ? '第' : 'p.'}${hit.page_number}${lang === 'zh' ? '页' : ''}` : ''}</div><p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)] line-clamp-4">{hit.content}</p></div>)}</div>}
           </div>
@@ -198,14 +200,14 @@ function SourceCard({ source, workspaceId, lang, onRefresh, onError }: { source:
     ? { core: '核心教材', supplementary: '补充资料', exam: '题库/考试', notes: '个人笔记', document: '学习资料' }
     : { core: 'Core material', supplementary: 'Supplementary', exam: 'Exam material', notes: 'Personal notes', document: 'Learning material' };
   const run = async (action: () => Promise<unknown>) => { try { await action(); await onRefresh(); } catch (error) { onError(error instanceof Error ? error.message : String(error)); } };
-  return <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] flex gap-3 items-start">
-    <span className="text-xl">{source.original_filename.toLowerCase().endsWith('.pdf') ? '📕' : '📄'}</span>
+  return <div className="flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-light)] text-[var(--color-accent)]"><AppIcon name="file" className="h-4 w-4" /></span>
     <div className="min-w-0 flex-1">
       <a href={`/api/v1/workspaces/${workspaceId}/knowledge/sources/${source.id}/download`} className="text-sm font-semibold text-[var(--color-text-heading)] hover:text-[var(--color-accent)]" target="_blank" rel="noreferrer">{source.title}</a>
       <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]"><span className="rounded bg-[var(--color-accent-light)] px-1.5 py-0.5 text-[var(--color-accent)]">{sourceTypeText[source.source_type] || source.source_type}</span><span>{formatBytes(source.byte_size)}</span><span>·</span><span className={source.status === 'failed' ? 'text-[var(--color-danger)]' : source.status === 'ready' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}>{statusText[source.status] || source.status}</span>{source.status === 'ready' && <><span>·</span><span>{source.chunk_count} {lang === 'zh' ? '个片段' : 'chunks'}</span></>}</div>
       {source.error_message && <p className="text-xs text-[var(--color-danger)] mt-1">{source.error_message}</p>}
     </div>
-    <div className="flex gap-2 text-xs">{source.status === 'failed' && <button className="text-[var(--color-accent)]" onClick={() => void run(() => retryKnowledgeSource(workspaceId, source.id))}>{lang === 'zh' ? '重试' : 'Retry'}</button>}<button className="text-[var(--color-danger)]" onClick={() => { if (confirm(lang === 'zh' ? '确定删除这份资料？' : 'Delete this source?')) void run(() => deleteKnowledgeSource(workspaceId, source.id)); }}>×</button></div>
+    <div className="flex shrink-0 gap-1">{source.status === 'failed' && <button className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-[var(--color-accent)] hover:bg-[var(--color-accent-light)]" onClick={() => void run(() => retryKnowledgeSource(workspaceId, source.id))}><AppIcon name="refresh" className="h-3.5 w-3.5" />{lang === 'zh' ? '重试' : 'Retry'}</button>}<button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-danger)] hover:bg-[var(--color-danger-bg)]" aria-label={lang === 'zh' ? '删除资料' : 'Delete source'} onClick={() => { if (confirm(lang === 'zh' ? '确定删除这份资料？' : 'Delete this source?')) void run(() => deleteKnowledgeSource(workspaceId, source.id)); }}><AppIcon name="trash" className="h-3.5 w-3.5" /></button></div>
   </div>;
 }
 
@@ -221,5 +223,5 @@ function ResourceSection({ title, resources, onDelete }: { title: string; resour
 
 function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: () => void }) {
   const { t } = useTranslation();
-  return <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] group flex items-start justify-between"><div className="min-w-0 flex-1"><div className="flex items-center"><a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[var(--color-accent)] hover:underline">{resource.title}</a>{resource.sourceLessonNumber && <span className="text-[10px] bg-[var(--color-accent-light)] text-[var(--color-accent)] px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{t('fromLesson')} #{String(resource.sourceLessonNumber).padStart(4, '0')}</span>}</div>{resource.description && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{resource.description}</p>}</div><button onClick={onDelete} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-xs text-[var(--color-danger)] px-1 ml-2 transition-opacity">×</button></div>;
+  return <div className="group flex items-start justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-3"><div className="min-w-0 flex-1"><div className="flex items-center"><a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[var(--color-accent)] hover:underline">{resource.title}</a>{resource.sourceLessonNumber && <span className="text-[10px] bg-[var(--color-accent-light)] text-[var(--color-accent)] px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{t('fromLesson')} #{String(resource.sourceLessonNumber).padStart(4, '0')}</span>}</div>{resource.description && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{resource.description}</p>}</div><button onClick={onDelete} aria-label={t('delete')} className="ml-2 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--color-danger)] opacity-100 transition-all hover:bg-[var(--color-danger-bg)] sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"><AppIcon name="trash" className="h-3.5 w-3.5" /></button></div>;
 }

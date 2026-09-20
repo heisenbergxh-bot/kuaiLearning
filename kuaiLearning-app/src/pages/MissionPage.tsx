@@ -5,13 +5,14 @@ import { useTranslation } from '../i18n/useTranslation';
 import { MissionChat } from '../components/MissionChat';
 import type { Mission as MissionType } from '../types';
 import { ApiError } from '../api/http';
+import { AppIcon } from '../components/AppIcon';
 
 export function MissionPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
   const { workspaces, activeId, loadWorkspaces, createWorkspace, updateMission } = useWorkspaceStore();
   const workspace = workspaces.find(w => w.id === activeId);
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
 
   const [topic, setTopic] = useState('');
@@ -23,6 +24,13 @@ export function MissionPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [deletedConflict, setDeletedConflict] = useState(false);
+  const hasChanges = Boolean(workspace && (
+    topic !== workspace.mission.topic
+    || why !== workspace.mission.why
+    || successItems.join('\u0000') !== (workspace.mission.successLooksLike || []).join('\u0000')
+    || constraints !== workspace.mission.constraints
+    || outOfScope !== workspace.mission.outOfScope
+  ));
 
   useEffect(() => {
     loadWorkspaces();
@@ -37,6 +45,16 @@ export function MissionPage() {
       setOutOfScope(workspace.mission.outOfScope);
     }
   }, [workspace]);
+
+  useEffect(() => {
+    if (!hasChanges) return;
+    const warnBeforeLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeave);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeave);
+  }, [hasChanges]);
 
   if (workspaces.length === 0 && !workspaceId) {
     return (
@@ -125,7 +143,7 @@ export function MissionPage() {
   };
 
   return (
-    <div className="fade-in max-w-2xl">
+    <div className="fade-in max-w-3xl">
       <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">
         {t('missionTitle')}: {workspace.name}
       </h2>
@@ -133,7 +151,7 @@ export function MissionPage() {
         {t('missionDesc')}
       </p>
 
-      <div className="space-y-5">
+      <div className="space-y-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-5 shadow-sm sm:p-6">
         <div>
           <label className="block text-sm font-semibold text-[var(--color-text-heading)] mb-1.5">
             {t('topicLabel')}
@@ -168,14 +186,15 @@ export function MissionPage() {
           <p className="text-xs text-[var(--color-text-muted)] mb-1.5">{t('successHint')}</p>
           <div className="space-y-1.5 mb-2">
             {successItems.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="text-xs text-[var(--color-text-muted)] w-4">•</span>
+              <div key={idx} className="group flex items-center gap-2 rounded-lg bg-[var(--color-bg-subtle)] px-3 py-2">
+                <AppIcon name="check" className="h-4 w-4 shrink-0 text-[var(--color-success)]" />
                 <span className="flex-1 text-sm text-[var(--color-text)]">{item}</span>
                 <button
                   onClick={() => removeSuccessItem(idx)}
-                  className="text-xs text-[var(--color-danger)] px-1"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-danger)] opacity-100 transition-colors hover:bg-[var(--color-danger-bg)] sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                  aria-label={lang === 'zh' ? '删除成功标准' : 'Remove success criterion'}
                 >
-                  ×
+                  <AppIcon name="trash" className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}
@@ -224,15 +243,27 @@ export function MissionPage() {
           />
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full px-4 py-2.5 bg-[var(--color-accent)] text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {saving ? t('saving') : t('saveMission')}
-        </button>
+      </div>
+
+      <div className="sticky bottom-4 z-10 mt-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-card)]/95 p-3 shadow-lg shadow-black/5 backdrop-blur-xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <span className={`h-2 w-2 rounded-full ${hasChanges ? 'bg-[var(--color-warning)]' : 'bg-[var(--color-success)]'}`} />
+            <span className={hasChanges ? 'text-[var(--color-text)]' : 'text-[var(--color-text-muted)]'}>
+              {hasChanges ? (lang === 'zh' ? '有尚未保存的更改' : 'You have unsaved changes') : (lang === 'zh' ? '所有更改已保存' : 'All changes saved')}
+            </span>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-5 py-2.5 font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <AppIcon name="check" className="h-4 w-4" />
+            {saving ? t('saving') : t('saveMission')}
+          </button>
+        </div>
         {saveMessage && (
-          <div className={`rounded-lg border p-3 text-sm ${deletedConflict ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] text-[var(--color-warning)]' : 'border-[var(--color-success-border)] bg-[var(--color-success-bg)] text-[var(--color-success)]'}`} role="status">
+          <div className={`mt-3 rounded-lg border p-3 text-sm ${deletedConflict ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] text-[var(--color-warning)]' : 'border-[var(--color-success-border)] bg-[var(--color-success-bg)] text-[var(--color-success)]'}`} role="status">
             <p>{saveMessage}</p>
             {deletedConflict && (
               <div className="mt-3 flex flex-wrap gap-2">
