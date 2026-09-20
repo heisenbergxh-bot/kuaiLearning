@@ -12,6 +12,7 @@ vi.mock('../ai/client', () => ({
 
 const settings: Settings = {
   language: 'en',
+  theme: 'system',
 };
 
 const workspace: Workspace = {

@@ -159,7 +159,7 @@ export const translations = {
 
   // Settings Page
   settingsTitle: { zh: '设置', en: 'Settings' },
-  settingsDesc: { zh: '管理 AI 服务配置和界面语言。', en: 'Manage AI services and your interface language.' },
+  settingsDesc: { zh: '管理界面外观、语言和 AI 服务配置。', en: 'Manage appearance, language, and AI services.' },
   serverAiTitle: { zh: 'AI 模型配置', en: 'AI model settings' },
   serverAiDescription: { zh: '学习大纲、课程生成和聊天共用此配置。管理员保存后立即生效，密钥加密保存在服务器。', en: 'Roadmaps, lessons and chat share these settings. Administrator changes apply immediately; the key is encrypted on the server.' },
   browserAiTitle: { zh: '课程生成与聊天 · 浏览器配置', en: 'Lessons and chat · Browser settings' },

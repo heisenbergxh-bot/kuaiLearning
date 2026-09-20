@@ -121,7 +121,7 @@ export function ResourcesPage() {
                   ? (lang === 'zh' ? `还有 ${processingCount} 份资料正在解析，完成后再生成学习路线，课程会更贴合原文。` : `${processingCount} material(s) are still processing. Generate the roadmap after they are ready.`)
                   : (lang === 'zh' ? `已有 ${readyCount} 份资料可用于学习路线、课时生成和答疑。` : `${readyCount} material(s) can now ground the roadmap, lessons, and chat.`)}
               </p>
-              {(uploadErrors > 0 || failedCount > 0) && <p className="mt-1 text-xs text-red-500">{lang === 'zh' ? `${uploadErrors + failedCount} 份资料未成功处理，可在下方重试或重新上传。` : `${uploadErrors + failedCount} material(s) need attention.`}</p>}
+              {(uploadErrors > 0 || failedCount > 0) && <p className="mt-1 text-xs text-[var(--color-danger)]">{lang === 'zh' ? `${uploadErrors + failedCount} 份资料未成功处理，可在下方重试或重新上传。` : `${uploadErrors + failedCount} material(s) need attention.`}</p>}
             </div>
             <button
               onClick={() => navigate(`/workspace/${workspaceId}/lessons`)}
@@ -166,7 +166,7 @@ export function ResourcesPage() {
             {hits.length > 0 && <div className="mt-4 space-y-3">{hits.map((hit, index) => <div key={hit.chunk_id} className="text-sm border-l-2 border-[var(--color-accent-border)] pl-3"><div className="font-medium text-[var(--color-text-heading)]">{index + 1}. {hit.source_title}{hit.page_number ? ` · ${lang === 'zh' ? '第' : 'p.'}${hit.page_number}${lang === 'zh' ? '页' : ''}` : ''}</div><p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)] line-clamp-4">{hit.content}</p></div>)}</div>}
           </div>
         )}
-        {message && <p className="mt-3 text-sm text-red-500">{message}</p>}
+        {message && <p className="mt-3 text-sm text-[var(--color-danger)]">{message}</p>}
       </section>
 
       <section>
@@ -202,10 +202,10 @@ function SourceCard({ source, workspaceId, lang, onRefresh, onError }: { source:
     <span className="text-xl">{source.original_filename.toLowerCase().endsWith('.pdf') ? '📕' : '📄'}</span>
     <div className="min-w-0 flex-1">
       <a href={`/api/v1/workspaces/${workspaceId}/knowledge/sources/${source.id}/download`} className="text-sm font-semibold text-[var(--color-text-heading)] hover:text-[var(--color-accent)]" target="_blank" rel="noreferrer">{source.title}</a>
-      <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]"><span className="rounded bg-[var(--color-accent-light)] px-1.5 py-0.5 text-[var(--color-accent)]">{sourceTypeText[source.source_type] || source.source_type}</span><span>{formatBytes(source.byte_size)}</span><span>·</span><span className={source.status === 'failed' ? 'text-red-500' : source.status === 'ready' ? 'text-green-600' : 'text-amber-600'}>{statusText[source.status] || source.status}</span>{source.status === 'ready' && <><span>·</span><span>{source.chunk_count} {lang === 'zh' ? '个片段' : 'chunks'}</span></>}</div>
-      {source.error_message && <p className="text-xs text-red-500 mt-1">{source.error_message}</p>}
+      <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]"><span className="rounded bg-[var(--color-accent-light)] px-1.5 py-0.5 text-[var(--color-accent)]">{sourceTypeText[source.source_type] || source.source_type}</span><span>{formatBytes(source.byte_size)}</span><span>·</span><span className={source.status === 'failed' ? 'text-[var(--color-danger)]' : source.status === 'ready' ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'}>{statusText[source.status] || source.status}</span>{source.status === 'ready' && <><span>·</span><span>{source.chunk_count} {lang === 'zh' ? '个片段' : 'chunks'}</span></>}</div>
+      {source.error_message && <p className="text-xs text-[var(--color-danger)] mt-1">{source.error_message}</p>}
     </div>
-    <div className="flex gap-2 text-xs">{source.status === 'failed' && <button className="text-[var(--color-accent)]" onClick={() => void run(() => retryKnowledgeSource(workspaceId, source.id))}>{lang === 'zh' ? '重试' : 'Retry'}</button>}<button className="text-red-400" onClick={() => { if (confirm(lang === 'zh' ? '确定删除这份资料？' : 'Delete this source?')) void run(() => deleteKnowledgeSource(workspaceId, source.id)); }}>×</button></div>
+    <div className="flex gap-2 text-xs">{source.status === 'failed' && <button className="text-[var(--color-accent)]" onClick={() => void run(() => retryKnowledgeSource(workspaceId, source.id))}>{lang === 'zh' ? '重试' : 'Retry'}</button>}<button className="text-[var(--color-danger)]" onClick={() => { if (confirm(lang === 'zh' ? '确定删除这份资料？' : 'Delete this source?')) void run(() => deleteKnowledgeSource(workspaceId, source.id)); }}>×</button></div>
   </div>;
 }
 
@@ -221,5 +221,5 @@ function ResourceSection({ title, resources, onDelete }: { title: string; resour
 
 function ResourceCard({ resource, onDelete }: { resource: Resource; onDelete: () => void }) {
   const { t } = useTranslation();
-  return <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] group flex items-start justify-between"><div className="min-w-0 flex-1"><div className="flex items-center"><a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[var(--color-accent)] hover:underline">{resource.title}</a>{resource.sourceLessonNumber && <span className="text-[10px] bg-[var(--color-accent-light)] text-[var(--color-accent)] px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{t('fromLesson')} #{String(resource.sourceLessonNumber).padStart(4, '0')}</span>}</div>{resource.description && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{resource.description}</p>}</div><button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 px-1 ml-2 transition-opacity">×</button></div>;
+  return <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-card)] group flex items-start justify-between"><div className="min-w-0 flex-1"><div className="flex items-center"><a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[var(--color-accent)] hover:underline">{resource.title}</a>{resource.sourceLessonNumber && <span className="text-[10px] bg-[var(--color-accent-light)] text-[var(--color-accent)] px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">{t('fromLesson')} #{String(resource.sourceLessonNumber).padStart(4, '0')}</span>}</div>{resource.description && <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{resource.description}</p>}</div><button onClick={onDelete} className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-xs text-[var(--color-danger)] px-1 ml-2 transition-opacity">×</button></div>;
 }

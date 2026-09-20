@@ -12,13 +12,25 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useWorkspaceStore } from './stores/useWorkspaceStore';
 import { AuthGate } from './auth/AuthGate';
+import { useSettingsStore } from './stores/useSettingsStore';
+import { applyTheme, darkModeQuery } from './lib/theme';
 
 function AppContent() {
   const { loadWorkspaces } = useWorkspaceStore();
+  const theme = useSettingsStore(state => state.settings.theme);
 
   useEffect(() => {
     loadWorkspaces();
   }, [loadWorkspaces]);
+
+  useEffect(() => {
+    applyTheme(theme);
+    if (theme !== 'system') return;
+    const media = window.matchMedia(darkModeQuery);
+    const syncTheme = () => applyTheme('system');
+    media.addEventListener('change', syncTheme);
+    return () => media.removeEventListener('change', syncTheme);
+  }, [theme]);
 
   return <Layout />;
 }

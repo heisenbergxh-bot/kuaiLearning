@@ -104,7 +104,7 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
         {messages.length > 0 && (
           <button
             onClick={handleClear}
-            className="text-xs text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
           >
             {t('clearChat')}
           </button>
@@ -152,7 +152,7 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
 
         {error && (
           <div className="text-center">
-            <p className="text-xs text-red-500">{error}</p>
+            <p className="text-xs text-[var(--color-danger)]">{error}</p>
           </div>
         )}
       </div>

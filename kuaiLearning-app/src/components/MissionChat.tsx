@@ -242,7 +242,7 @@ export function MissionChat({ open, onClose }: MissionChatProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4 backdrop-blur-[2px]"
       onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div className="w-full max-w-lg bg-[var(--color-bg-card)] rounded-2xl shadow-2xl flex flex-col max-h-[88vh]">
@@ -425,12 +425,12 @@ export function MissionChat({ open, onClose }: MissionChatProps) {
                         <option value="exam">{t('sourceTypeExam')}</option>
                         <option value="notes">{t('sourceTypeNotes')}</option>
                       </select>
-                      <button onClick={() => setSelectedFiles(current => current.filter((_, itemIndex) => itemIndex !== index))} className="px-1 text-sm text-red-400 hover:text-red-600">×</button>
+                      <button onClick={() => setSelectedFiles(current => current.filter((_, itemIndex) => itemIndex !== index))} className="px-1 text-sm text-[var(--color-danger)]">×</button>
                     </div>
                   ))}
                 </div>
               )}
-              {fileError && <p className="text-xs text-red-500">{fileError}</p>}
+              {fileError && <p className="text-xs text-[var(--color-danger)]">{fileError}</p>}
               <div className="flex gap-2">
                 <button onClick={submitMaterials} className={`${primaryBtn} flex-1`}>{selectedFiles.length ? t('mcContinueWithMaterials') : t('skip')}</button>
               </div>

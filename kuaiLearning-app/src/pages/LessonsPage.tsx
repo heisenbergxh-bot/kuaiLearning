@@ -190,7 +190,7 @@ export function LessonsPage() {
                       {lesson.title}
                     </h3>
                     {lesson.completedAt && (
-                      <span className="shrink-0 text-[10px] font-medium text-green-600 bg-green-500/10 border border-green-500/30 px-1.5 py-0.5 rounded-full">
+                      <span className="shrink-0 text-[10px] font-medium text-[var(--color-success)] bg-[var(--color-success-bg)] border border-[var(--color-success-border)] px-1.5 py-0.5 rounded-full">
                         ✓ {t('completed')}
                       </span>
                     )}
@@ -244,7 +244,7 @@ function CourseSourcesPanel({ sources, lang, onManage }: { sources: KnowledgeSou
           {ready.map(source => <span key={source.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--color-accent-border)] bg-[var(--color-accent-light)]/40 px-2.5 py-1 text-xs text-[var(--color-text)]"><span className="text-[10px] text-[var(--color-accent)]">{labels[source.source_type] || labels.document}</span><span className="max-w-52 truncate">{source.title}</span></span>)}
         </div>
       )}
-      {processing.length > 0 && <p className="mt-2 text-xs text-amber-600">{lang === 'zh' ? `${processing.length} 份资料正在解析，完成前不会生成学习路线。` : `${processing.length} material(s) are processing. Roadmap generation will wait.`}</p>}
+      {processing.length > 0 && <p className="mt-2 text-xs text-[var(--color-warning)]">{lang === 'zh' ? `${processing.length} 份资料正在解析，完成前不会生成学习路线。` : `${processing.length} material(s) are processing. Roadmap generation will wait.`}</p>}
     </div>
   );
 }

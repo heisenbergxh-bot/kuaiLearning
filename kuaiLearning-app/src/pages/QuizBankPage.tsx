@@ -128,8 +128,8 @@ export function QuizBankPage() {
                   const isCorrect = opt.correct;
                   const isPicked = selected === i;
                   let cls = 'border-[var(--color-border)] hover:border-[var(--color-accent-border)] hover:bg-[var(--color-accent-light)]/40';
-                  if (isAnswered && isCorrect) cls = 'border-green-500 bg-green-500/10';
-                  else if (isAnswered && isPicked && !isCorrect) cls = 'border-red-500 bg-red-500/10';
+                  if (isAnswered && isCorrect) cls = 'border-[var(--color-success-border)] bg-[var(--color-success-bg)]';
+                  else if (isAnswered && isPicked && !isCorrect) cls = 'border-[var(--color-danger-border)] bg-[var(--color-danger-bg)]';
                   else if (isAnswered) cls = 'border-[var(--color-border)] opacity-60';
                   return (
                     <button

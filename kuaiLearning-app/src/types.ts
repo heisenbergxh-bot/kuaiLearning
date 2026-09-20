@@ -113,6 +113,7 @@ export interface QuizQuestion {
 }
 
 export type Language = 'zh' | 'en';
+export type ThemePreference = 'system' | 'light' | 'dark';
 
 export interface ChatMessage {
   id: string;
@@ -124,6 +125,7 @@ export interface ChatMessage {
 
 export interface Settings {
   language: Language;
+  theme: ThemePreference;
 }
 
 export interface AIGenerateRequest {

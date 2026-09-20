@@ -173,7 +173,7 @@ export function MissionPage() {
                 <span className="flex-1 text-sm text-[var(--color-text)]">{item}</span>
                 <button
                   onClick={() => removeSuccessItem(idx)}
-                  className="text-xs text-red-400 hover:text-red-600 px-1"
+                  className="text-xs text-[var(--color-danger)] px-1"
                 >
                   ×
                 </button>
@@ -232,12 +232,12 @@ export function MissionPage() {
           {saving ? t('saving') : t('saveMission')}
         </button>
         {saveMessage && (
-          <div className={`rounded-lg border p-3 text-sm ${deletedConflict ? 'border-amber-400/50 bg-amber-50 text-amber-800' : 'border-green-500/30 bg-green-500/10 text-green-700'}`} role="status">
+          <div className={`rounded-lg border p-3 text-sm ${deletedConflict ? 'border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] text-[var(--color-warning)]' : 'border-[var(--color-success-border)] bg-[var(--color-success-bg)] text-[var(--color-success)]'}`} role="status">
             <p>{saveMessage}</p>
             {deletedConflict && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button onClick={() => void handleSaveAsCopy()} disabled={saving} className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">{t('saveAsNewWorkspace')}</button>
-                <button onClick={() => void handleLeaveDeletedWorkspace()} disabled={saving} className="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs font-medium disabled:opacity-50">{t('backToActiveWorkspace')}</button>
+                <button onClick={() => void handleLeaveDeletedWorkspace()} disabled={saving} className="rounded-lg border border-[var(--color-warning-border)] px-3 py-1.5 text-xs font-medium disabled:opacity-50">{t('backToActiveWorkspace')}</button>
               </div>
             )}
           </div>

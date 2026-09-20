@@ -165,7 +165,7 @@ export function LearningRecordsPage() {
                 </div>
                 <button
                   onClick={() => handleDelete(record.id)}
-                  className="opacity-0 group-hover:opacity-100 text-xs text-red-400 hover:text-red-600 px-2 py-1 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-xs text-[var(--color-danger)] px-2 py-1 transition-opacity"
                 >
                   {t('delete')}
                 </button>

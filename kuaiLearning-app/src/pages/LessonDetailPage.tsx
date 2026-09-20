@@ -154,7 +154,7 @@ export function LessonDetailPage() {
             </p>
           </div>
           {lesson.completedAt ? (
-            <span className="mt-1.5 shrink-0 inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-500/10 border border-green-500/30 px-2.5 py-1 rounded-full">
+            <span className="mt-1.5 shrink-0 inline-flex items-center gap-1 text-xs font-medium text-[var(--color-success)] bg-[var(--color-success-bg)] border border-[var(--color-success-border)] px-2.5 py-1 rounded-full">
               ✓ {t('completed')}
             </span>
           ) : (

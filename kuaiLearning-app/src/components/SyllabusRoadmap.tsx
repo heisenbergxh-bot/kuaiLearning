@@ -61,7 +61,7 @@ export function SyllabusRoadmap({
   const doneCount = items.filter(it => statusOf(it) === 'completed').length;
 
   const badge = (status: ItemStatus) => {
-    if (status === 'completed') return <span className="shrink-0 text-[10px] font-medium text-green-600 bg-green-500/10 border border-green-500/30 px-1.5 py-0.5 rounded-full">✓ {t('statusCompleted')}</span>;
+    if (status === 'completed') return <span className="shrink-0 text-[10px] font-medium text-[var(--color-success)] bg-[var(--color-success-bg)] border border-[var(--color-success-border)] px-1.5 py-0.5 rounded-full">✓ {t('statusCompleted')}</span>;
     if (status === 'generated') return <span className="shrink-0 text-[10px] font-medium text-[var(--color-accent)] bg-[var(--color-accent-light)] border border-[var(--color-accent-border)] px-1.5 py-0.5 rounded-full">{t('statusGenerated')}</span>;
     return <span className="shrink-0 text-[10px] font-medium text-[var(--color-text-muted)] border border-[var(--color-border)] px-1.5 py-0.5 rounded-full">{t('statusPlanned')}</span>;
   };
