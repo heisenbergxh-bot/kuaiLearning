@@ -11,6 +11,8 @@ import { generateRemoteSyllabus, syllabusItemFromRemote } from '../api/learningC
 import { synchronizeLearningContent } from '../api/learningContentSync';
 import { listKnowledgeSources, type KnowledgeSource } from '../api/knowledge';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
+import { GenerationProgressPanel } from '../components/GenerationProgressPanel';
+import { useGenerationProgress } from '../lib/useGenerationProgress';
 
 export function LessonsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -26,6 +28,8 @@ export function LessonsPage() {
   const [generating, setGenerating] = useState(false);
   const [genStatus, setGenStatus] = useState('');
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
+  const generation = useGenerationProgress();
+  const [generatingItemId, setGeneratingItemId] = useState<string>();
 
 
   const loadLessons = useCallback(async () => {
@@ -70,6 +74,7 @@ export function LessonsPage() {
       return;
     }
     setGenerating(true);
+    generation.clear();
     setGenStatus(t('generatingSyllabus'));
     try {
       const remoteItems = await generateRemoteSyllabus(
@@ -95,22 +100,23 @@ export function LessonsPage() {
   const handleGenerate = async (targetItem?: SyllabusItem) => {
     if (!workspaceId || generating) return;
     setGenerating(true);
-    setGenStatus(t('genPreparing'));
+    setGenStatus('');
+    setGeneratingItemId(targetItem?.id);
+    generation.begin(targetItem?.title || t('generateBtn'));
     try {
-      await generateAndSaveLesson(settings, workspaceId, {
+      const lesson = await generateAndSaveLesson(settings, workspaceId, {
         targetItem,
-        onChunk: (chunk) => {
-          setGenStatus(prev => prev.length > 80 ? t('genGenerating') : prev + chunk.slice(0, 30));
-        },
+        onChunk: generation.onChunk,
+        onPhase: generation.onPhase,
       });
+      generation.finish(lesson.id);
       await loadLessons();
       await loadSyllabus();
-      setGenStatus(t('genDone'));
-      setTimeout(() => setGenStatus(''), 2000);
     } catch (err: any) {
-      setGenStatus(`${t('error')}: ${err.message}`);
+      generation.fail(err);
     } finally {
       setGenerating(false);
+      setGeneratingItemId(undefined);
     }
   };
 
@@ -141,10 +147,17 @@ export function LessonsPage() {
         onManage={() => navigate(`/workspace/${workspaceId}/resources`)}
       />
 
+      {generation.progress && <GenerationProgressPanel
+        progress={generation.progress}
+        onOpen={lessonId => navigate(`/workspace/${workspaceId}/lesson/${lessonId}`)}
+        onDismiss={generation.clear}
+      />}
+
       <SyllabusRoadmap
         items={syllabus}
         lessons={lessons}
         busy={generating}
+        generatingItemId={generatingItemId}
         onGenerateSyllabus={() => handleGenerateSyllabus('full')}
         onReplan={(guidance) => handleGenerateSyllabus('replan', guidance)}
         onGenerateItem={(item) => handleGenerate(item)}

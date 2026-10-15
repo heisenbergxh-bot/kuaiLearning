@@ -53,12 +53,13 @@ interface QuizState {
 interface LessonRendererProps {
   htmlContent: string;
   onQuizAnswer?: (quizId: string, correct: boolean) => void;
+  fitContent?: boolean;
 }
 
-export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProps) {
+export function LessonRenderer({ htmlContent, onQuizAnswer, fitContent = false }: LessonRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const onQuizAnswerRef = useRef(onQuizAnswer);
-  const [height, setHeight] = useState(600);
+  const [height, setHeight] = useState(fitContent ? 240 : 600);
   onQuizAnswerRef.current = onQuizAnswer;
 
   const setupQuizListeners = useCallback((doc: Document) => {
@@ -122,8 +123,15 @@ export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProp
     if (!doc) return;
 
     doc.open();
-    doc.write(htmlContent || '<!DOCTYPE html><html><head></head><body></body></html>');
+    const content = htmlContent || '<!DOCTYPE html><html><head></head><body></body></html>';
+    doc.write(fitContent && !/<!doctype\s+html/i.test(content) ? `<!DOCTYPE html>${content}` : content);
     doc.close();
+    if (fitContent) {
+      for (const element of [doc.documentElement, doc.body]) {
+        element?.style.setProperty('height', 'auto', 'important');
+        element?.style.setProperty('min-height', '0', 'important');
+      }
+    }
 
     // Inject a light base stylesheet as the FIRST head child so it provides
     // sane defaults (themed CSS vars, body, tables, quiz blocks) that the
@@ -149,7 +157,9 @@ export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProp
       const body = doc.body;
       const html = doc.documentElement;
       if (!body || !html) return;
-      const h = Math.max(
+      // Reference sheets can be short. Measure their body instead of the
+      // iframe viewport, which would feed its previous height back into itself.
+      const h = fitContent ? Math.ceil(body.getBoundingClientRect().height) : Math.max(
         body.scrollHeight,
         body.offsetHeight,
         html.clientHeight,
@@ -173,7 +183,7 @@ export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProp
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [htmlContent, setupQuizListeners]);
+  }, [htmlContent, setupQuizListeners, fitContent]);
 
   return (
     <iframe
@@ -181,7 +191,7 @@ export function LessonRenderer({ htmlContent, onQuizAnswer }: LessonRendererProp
       title="Lesson Content"
       sandbox="allow-scripts allow-same-origin"
       className="w-full border-none bg-white rounded-lg"
-      style={{ height: `${height}px`, minHeight: '400px' }}
+      style={{ height: `${height}px`, minHeight: fitContent ? '240px' : '400px' }}
     />
   );
 }

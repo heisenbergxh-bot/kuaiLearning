@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { LessonRenderer } from '../components/LessonRenderer';
-import { ChatPanel } from '../components/ChatPanel';
+import { FloatingLessonChat } from '../components/FloatingLessonChat';
 import { GlossaryTermCard } from '../components/GlossaryTermCard';
 import { useTranslation } from '../i18n/useTranslation';
 import { useSettingsStore } from '../stores/useSettingsStore';
@@ -9,6 +9,8 @@ import { generateAndSaveLesson, deleteLessonCascade } from '../lib/lessonGen';
 import type { Lesson, Reference, GlossaryTerm, SyllabusItem } from '../types';
 import { db } from '../db';
 import { updateLocalLessonAndSync } from '../api/learningContentSync';
+import { GenerationProgressPanel } from '../components/GenerationProgressPanel';
+import { useGenerationProgress } from '../lib/useGenerationProgress';
 
 type Tab = 'lesson' | 'reference' | 'glossary';
 
@@ -29,7 +31,7 @@ export function LessonDetailPage() {
   const [regenOpen, setRegenOpen] = useState(false);
   const [regenText, setRegenText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [busyStatus, setBusyStatus] = useState('');
+  const generation = useGenerationProgress();
   const { t } = useTranslation();
   const refWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +61,7 @@ export function LessonDetailPage() {
   const handleRegenerate = async () => {
     if (!lesson || !workspaceId || busy) return;
     setBusy(true);
-    setBusyStatus(t('genPreparing'));
+    generation.begin(lesson.title);
     const guidance = regenText.trim() || undefined;
     const oldNumber = lesson.number;
     try {
@@ -68,13 +70,15 @@ export function LessonDetailPage() {
         targetItem: linkedItem || undefined,
         userRequest: guidance,
         reuseNumber: oldNumber,
-        onChunk: (chunk) => setBusyStatus(prev => prev.length > 80 ? t('genGenerating') : prev + chunk.slice(0, 30)),
+        onChunk: generation.onChunk,
+        onPhase: generation.onPhase,
       });
+      generation.finish(newLesson.id);
       setRegenOpen(false);
       setRegenText('');
       navigate(`/workspace/${workspaceId}/lesson/${newLesson.id}`, { replace: true });
     } catch (err: any) {
-      setBusyStatus(`${t('error')}: ${err.message}`);
+      generation.fail(err);
     } finally {
       setBusy(false);
     }
@@ -135,7 +139,8 @@ export function LessonDetailPage() {
   ];
 
   return (
-    <div className="fade-in max-w-3xl">
+    <div className="fade-in max-w-3xl pb-20">
+      <FloatingLessonChat key={lesson.id} lessonId={lesson.id} lessonTitle={lesson.title} />
       <div className="mb-4">
         <Link
           to={`/workspace/${workspaceId}/lessons`}
@@ -167,6 +172,8 @@ export function LessonDetailPage() {
           )}
         </div>
       </div>
+
+      {generation.progress && <GenerationProgressPanel progress={generation.progress} onDismiss={generation.clear} />}
 
       {/* Lesson actions: regenerate / delete */}
       <div className="mb-4 flex items-center gap-2 flex-wrap">
@@ -205,7 +212,6 @@ export function LessonDetailPage() {
             >
               {t('cancel')}
             </button>
-            {busyStatus && <span className="text-xs text-[var(--color-text-muted)] font-mono truncate">{busyStatus}</span>}
           </div>
         </div>
       )}
@@ -266,9 +272,6 @@ export function LessonDetailPage() {
             <LessonRenderer htmlContent={lesson.htmlContent} onQuizAnswer={handleQuizAnswer} />
           </div>
 
-          <div className="mt-6">
-            <ChatPanel lessonId={lesson.id} />
-          </div>
         </>
       )}
 

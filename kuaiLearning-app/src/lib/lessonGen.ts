@@ -4,12 +4,14 @@ import { extractQuizzes } from './extractQuizzes';
 import { db, deleteLocalLessonData, generateId } from '../db';
 import { deleteRemoteLesson } from '../api/learningContent';
 import { pushLocalLesson, pushLocalSyllabusItem } from '../api/learningContentSync';
+import type { LessonGenerationPhase } from './generationProgress';
 
 interface GenerateOpts {
   targetItem?: SyllabusItem;
   userRequest?: string;
   reuseNumber?: number;
   onChunk?: (chunk: string) => void;
+  onPhase?: (phase: LessonGenerationPhase) => void;
 }
 
 // Generate a lesson and persist it together with all its derived data
@@ -21,16 +23,19 @@ export async function generateAndSaveLesson(
   workspaceId: string,
   opts: GenerateOpts = {},
 ): Promise<Lesson> {
-  const { targetItem, userRequest, reuseNumber, onChunk } = opts;
+  const { targetItem, userRequest, reuseNumber, onChunk, onPhase } = opts;
 
+  onPhase?.('preparing');
   const result = await generateLessonStream(
     settings,
     workspaceId,
     targetItem ? userRequest : (userRequest || undefined),
     onChunk,
     targetItem?.id,
+    onPhase,
   );
 
+  onPhase?.('saving');
   const now = Date.now();
   const lesson = await db.transaction('rw', [
     db.lessons, db.syllabusItems, db.quizQuestions, db.glossaryTerms,
@@ -148,15 +153,18 @@ export async function generateAndSaveLesson(
   return lesson;
   });
 
+  onPhase?.('syncing');
   try {
     const synchronizedLesson = await pushLocalLesson(lesson);
     if (targetItem) {
       const synchronizedItem = await db.syllabusItems.get(targetItem.id);
       if (synchronizedItem) await pushLocalSyllabusItem(synchronizedItem);
     }
+    onPhase?.('done');
     return synchronizedLesson;
   } catch (reason) {
     console.warn('Generated lesson remains local and will be synchronized later.', reason);
+    onPhase?.('local-only');
     return lesson;
   }
 }

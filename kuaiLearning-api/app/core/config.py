@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,6 +39,13 @@ class Settings(BaseSettings):
     knowledge_chunk_overlap: int = Field(default=100, ge=0, le=500)
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "kuailearning_knowledge"
+    embedding_provider: Literal["local", "openai"] = "local"
+    embedding_base_url: str = "https://api.siliconflow.cn/v1"
+    embedding_api_key: SecretStr = SecretStr("")
+    embedding_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    embedding_batch_size: int = Field(default=16, ge=1, le=64)
+    embedding_max_concurrency: int = Field(default=2, ge=1, le=16)
+    embedding_max_retries: int = Field(default=2, ge=0, le=5)
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_dimensions: int = Field(default=384, ge=32, le=4096)
     embedding_cache_dir: str = "/opt/kuailearning/fastembed-cache"
@@ -47,6 +55,21 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_debug_auth_in_production(self) -> "Settings":
+        if self.embedding_provider == "openai":
+            url = urlsplit(self.embedding_base_url)
+            if (
+                url.scheme not in {"http", "https"}
+                or not url.hostname
+                or url.username is not None
+                or url.password is not None
+                or url.query
+                or url.fragment
+            ):
+                raise ValueError(
+                    "EMBEDDING_BASE_URL must be an HTTP(S) base URL without credentials"
+                )
+        if not self.embedding_model.strip():
+            raise ValueError("EMBEDDING_MODEL must not be empty")
         if self.knowledge_chunk_overlap >= self.knowledge_chunk_chars:
             raise ValueError("KNOWLEDGE_CHUNK_OVERLAP must be smaller than KNOWLEDGE_CHUNK_CHARS")
         if self.app_env == "production" and self.auth_mode == "development":

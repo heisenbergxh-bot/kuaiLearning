@@ -4,6 +4,7 @@ from app.api.routes import (
     ai_completion,
     ai_settings,
     auth,
+    embedding_settings,
     health,
     identity,
     knowledge,
@@ -14,6 +15,7 @@ from app.api.routes import (
 api_router = APIRouter()
 api_router.include_router(ai_completion.router)
 api_router.include_router(ai_settings.router)
+api_router.include_router(embedding_settings.router)
 api_router.include_router(auth.router)
 api_router.include_router(health.router)
 api_router.include_router(identity.router)

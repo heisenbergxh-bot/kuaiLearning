@@ -153,6 +153,85 @@ python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 ## 内网部署建议
 
+### 可配置的 Embedding 服务
+
+设置页新增“知识库 Embedding 模型”，与课程模型独立。管理员可读取、测试连接和保存
+provider、base URL、模型、输出维度和密钥；普通登录用户仅可查看。
+权限沿用 `AI_CONFIG_ADMIN_SUBJECTS`，密钥沿用 `AI_CONFIG_ENCRYPTION_KEY` 加密，
+API 不返回密钥，浏览器不持久保存密钥。无鉴权内网接口可勾选“无需密钥鉴权”。
+
+首次保存会保留同一接口已有的服务器密钥，不需要重新输入；留空保留已有密钥。
+更换接口时必须提供该接口的新密钥或明确选择无需鉴权，避免将旧密钥发往新地址。
+测试连接仅发送一条合成测试文本，不保存配置或索引。
+
+数据库配置优先于环境配置，每次知识库请求都会读取，保存后无需重启。
+部署前运行 `alembic upgrade head`（新增 `20261013_0007`）。
+有资料时，设置接口会阻止直接更换 provider、base URL、模型或维度；应先安排
+索引迁移或通过资料管理移除旧资料。处理中的资料会暂时阻止配置保存。
+更新同一模型的密钥不会改变索引集合。手工迁移命令现在默认读取有效数据库配置，
+因此不要仅修改环境变量来迁移已经通过设置页配置的模型。
+
+Embedding 与课程生成的 `MODEL_*` 配置完全独立；无需修改前端。
+`.env.example` 已预设硅基流动，目前官方将 `BAAI/bge-m3` 标注为免费模型。
+服务器环境文件需要填写实名认证账号的密钥：
+
+```dotenv
+EMBEDDING_PROVIDER=openai
+EMBEDDING_BASE_URL=https://api.siliconflow.cn/v1
+EMBEDDING_API_KEY=<在服务器环境文件中填写，不提交到 Git>
+EMBEDDING_MODEL=BAAI/bge-m3
+EMBEDDING_DIMENSIONS=1024
+EMBEDDING_TIMEOUT_SECONDS=30
+EMBEDDING_BATCH_SIZE=16
+EMBEDDING_MAX_CONCURRENCY=2
+EMBEDDING_MAX_RETRIES=2
+QDRANT_COLLECTION=kuailearning_knowledge
+```
+
+内网兼容 OpenAI 的服务只需替换地址、密钥（无鉴权时可留空）、模型和维度。
+地址是包含 `/v1` 等接口前缀的 base URL，不包含 `/embeddings`；HTTP 请求自动追加
+`/embeddings`，并发送 `model`、字符串数组 `input`、`encoding_format=float`。
+响应需要包含 `data[].index` 和 `data[].embedding`。更换配置后重启 API。
+当前不发送 `dimensions` 参数，应使用模型的默认输出维度。
+
+离线本地部署先安装 `pip install '.[local-embedding]'`，再配置：
+
+```dotenv
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+EMBEDDING_DIMENSIONS=384
+EMBEDDING_CACHE_DIR=/opt/kuailearning/fastembed-cache
+```
+
+未设置 provider 时保留原本的本地行为，但本地模型依赖现在是可选安装项。
+HTTP 模式不导入 FastEmbed 或加载本地模型。每进程限制并发，按配置分批请求，
+网络异常、429 和 5xx 采用有限指数退避；401 等错误直接失败。
+返回的数量、索引顺序、向量维度和数值均会检查。语义检索失败时仍尝试关键词检索。
+外部服务会接收文档分块及查询文本；内网资料应配置允许使用的内网服务。
+
+#### 已有向量迁移
+
+原有本地模型继续使用原集合；其他模型根据 provider、base URL、模型、维度生成
+集合名后缀，避免不同向量空间混用。切换模型或地址后需要重建向量。
+
+1. 保留旧 release、旧环境配置和旧 Qdrant 集合，暂停资料上传/删除。
+2. 准备新 release，使用新 embedding 配置和原数据库连接，在独立运维进程中运行
+   下列命令。先检查预览，再执行写入；硅基流动密钥必须有效。
+3. 完成后将 API 切换到相同新配置并重启，验证已有资料检索和新资料入库。
+4. 验证失败时切回旧 release 和旧配置。不要在本次迁移中删除旧集合。
+
+```bash
+# 先通过现有部署方式加载受限服务器环境文件；不要打印其中的密钥。
+python -m app.cli.reindex_knowledge
+python -m app.cli.reindex_knowledge --apply
+```
+
+命令从 MySQL 的 ready 资料读取已有分块，保留 chunk ID、原文和资料状态，
+写入新向量集合及现有关键词索引，不修改 MySQL 或删除旧集合。
+中断后可重跑（按相同 ID 覆盖），完成前不要将线上检索切换到新配置。
+回退期间产生的新资料需要用旧模型重建对应索引；恢复旧集合不等于新资料自动可检索。
+未配置有效密钥时，不应切换线上服务。实际节省的内存需要重启后重新观测。
+
 后端与前端 `dist` 分开发布：Nginx 继续托管前端，并把 `/api/` 反向代理到
 Uvicorn/Gunicorn 服务。外网准备与目标 Linux、Python 版本一致的 wheel 包目录，
 传入内网后使用 `pip install --no-index --find-links` 安装；不要把 Windows 虚拟环境

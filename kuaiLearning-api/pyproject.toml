@@ -17,7 +17,6 @@ dependencies = [
   "mcp>=1.13,<2",
   "pymupdf>=1.25,<2",
   "python-multipart>=0.0.20,<1",
-  "fastembed>=0.7,<1",
   "pydantic-settings>=2.7,<3",
   "PyJWT[crypto]>=2.10,<3",
   "sqlalchemy[asyncio]>=2.0.36,<3",
@@ -27,6 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+local-embedding = ["fastembed>=0.7,<1"]
 dev = [
   "aiosqlite>=0.20,<1",
   "mypy>=1.14,<2",

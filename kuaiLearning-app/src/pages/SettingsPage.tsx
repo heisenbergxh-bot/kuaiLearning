@@ -2,6 +2,7 @@ import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTranslation } from '../i18n/useTranslation';
 import { ServerAISettings } from '../components/ServerAISettings';
 import { ThemeControl } from '../components/ThemeControl';
+import { ServerEmbeddingSettings } from '../components/ServerEmbeddingSettings';
 
 export function SettingsPage() {
   const { settings, setLanguage } = useSettingsStore();
@@ -58,6 +59,7 @@ export function SettingsPage() {
         </section>
 
         <ServerAISettings />
+        <ServerEmbeddingSettings />
 
 
       </div>

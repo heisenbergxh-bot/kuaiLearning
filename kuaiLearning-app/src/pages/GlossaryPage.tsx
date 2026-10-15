@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
 import { GlossaryTermCard } from '../components/GlossaryTermCard';
-import type { GlossaryTerm } from '../types';
+import type { GlossaryTerm, Lesson } from '../types';
 import { db, generateId } from '../db';
+import { LibraryTools, LibraryNoResults, libraryInputClass } from '../components/LibraryTools';
+import { matchesLibraryCourse, matchesLibrarySearch } from '../lib/libraryView';
 
 export function GlossaryPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -14,17 +16,27 @@ export function GlossaryPage() {
   const [definition, setDefinition] = useState('');
   const [avoidRaw, setAvoidRaw] = useState('');
   const [category, setCategory] = useState('');
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [query, setQuery] = useState('');
+  const [course, setCourse] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const resetFilters = () => { setQuery(''); setCourse('all'); setCategoryFilter('all'); };
 
 
   const loadTerms = useCallback(async () => {
     setLoading(true);
-    const result = await db.glossaryTerms.where('workspaceId').equals(workspaceId!).toArray();
+    const [result, courses] = await Promise.all([
+      db.glossaryTerms.where('workspaceId').equals(workspaceId!).toArray(),
+      db.lessons.where('workspaceId').equals(workspaceId!).toArray(),
+    ]);
     setTerms(result.sort((a, b) => a.term.localeCompare(b.term)));
+    setLessons(courses);
     setLoading(false);
   }, [workspaceId]);
 
   useEffect(() => {
+    setQuery(''); setCourse('all'); setCategoryFilter('all'); setShowForm(false);
     if (workspaceId) void loadTerms();
   }, [workspaceId, loadTerms]);
 
@@ -44,6 +56,7 @@ export function GlossaryPage() {
     setAvoidRaw('');
     setCategory('');
     setShowForm(false);
+    resetFilters();
     await loadTerms();
   };
 
@@ -54,7 +67,10 @@ export function GlossaryPage() {
     }
   };
 
-  const grouped = terms.reduce((acc, t) => {
+  const filtered = terms.filter(term => matchesLibraryCourse(course, term.sourceLessonId)
+    && (categoryFilter === 'all' || (categoryFilter === 'uncategorized' && !term.category) || categoryFilter === `category:${term.category}`)
+    && matchesLibrarySearch(query, term.term, term.definition, term.category, (term.avoid || []).join(' '), lessons.find(lesson => lesson.id === term.sourceLessonId)?.title));
+  const grouped = filtered.reduce((acc, t) => {
     const key = t.category || 'Uncategorized';
     if (!acc[key]) acc[key] = [];
     acc[key].push(t);
@@ -70,19 +86,30 @@ export function GlossaryPage() {
   }
 
   return (
-    <div className="fade-in max-w-2xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="fade-in max-w-4xl">
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('glossaryTitle')}</h2>
           <p className="text-sm text-[var(--color-text-muted)]">{t('glossaryDesc')}</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors"
+          className="shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors"
         >
           {showForm ? t('cancel') : t('addTerm')}
         </button>
       </div>
+
+      {terms.length > 0 && <>
+        <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={setCourse} lessons={lessons} sourceIds={terms.map(term => term.sourceLessonId)} count={filtered.length} total={terms.length} onReset={resetFilters} />
+        <div className="mb-5 flex flex-wrap items-center gap-2"><label htmlFor="glossary-category" className="text-xs text-[var(--color-text-muted)]">{lang === 'zh' ? '术语分类' : 'Category'}</label>
+          <select id="glossary-category" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className={`${libraryInputClass} max-w-52`}><option value="all">{lang === 'zh' ? '全部分类' : 'All categories'}</option>
+            {terms.some(term => !term.category) && <option value="uncategorized">{t('uncategorized')}</option>}
+            {[...new Set(terms.map(term => term.category).filter((category): category is string => !!category))].sort().map(category => <option key={category} value={`category:${category}`}>{category}</option>)}
+          </select>
+          <span className="text-xs text-[var(--color-text-muted)]">{lang === 'zh' ? '点击术语展开完整定义与易混淆说法' : 'Expand a term for its definition and confusing wording'}</span>
+        </div>
+      </>}
 
       {showForm && (
         <div className="mb-6 p-4 rounded-xl border border-[var(--color-accent-border)] bg-[var(--color-bg-card)] space-y-3">
@@ -129,7 +156,7 @@ export function GlossaryPage() {
           <p className="text-[var(--color-text-muted)]">{t('noGlossaryYet')}</p>
           <p className="text-sm text-[var(--color-text-muted)]">{t('noGlossaryHint')}</p>
         </div>
-      ) : (
+      ) : terms.length > 0 && filtered.length === 0 ? <LibraryNoResults onReset={resetFilters} /> : (
         <div className="space-y-6">
           {Object.entries(grouped).map(([cat, catTerms]) => (
             <div key={cat}>
@@ -144,10 +171,11 @@ export function GlossaryPage() {
                   <div className="flex-1 h-px bg-[var(--color-border)]" />
                 </div>
               )}
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                {catTerms.map(gt => (
-                  <GlossaryTermCard key={gt.id} term={gt} onDelete={handleDelete} />
-                ))}
+              <div className="space-y-2">
+                {catTerms.map(gt => {
+                  const source = lessons.find(lesson => lesson.id === gt.sourceLessonId);
+                  return <GlossaryTermCard key={gt.id} term={gt} compact onDelete={handleDelete} sourceHref={source ? `/workspace/${workspaceId}/lesson/${source.id}` : undefined} sourceLabel={source?.title} />;
+                })}
               </div>
             </div>
           ))}

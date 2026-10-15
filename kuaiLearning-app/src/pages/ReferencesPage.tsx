@@ -1,125 +1,75 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { LessonRenderer } from '../components/LessonRenderer';
+import { LibraryTools, LibraryNoResults } from '../components/LibraryTools';
+import { matchesLibraryCourse, matchesLibrarySearch, referenceText } from '../lib/libraryView';
 import { useTranslation } from '../i18n/useTranslation';
-import type { Reference } from '../types';
+import type { Reference, Lesson } from '../types';
 import { db } from '../db';
 
 export function ReferencesPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const [references, setReferences] = useState<Reference[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRef, setSelectedRef] = useState<Reference | null>(null);
-  const { t } = useTranslation();
+  const [query, setQuery] = useState('');
+  const [course, setCourse] = useState('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileReading, setMobileReading] = useState(false);
+  const { t, lang } = useTranslation();
+  const zh = lang === 'zh';
   const rendererWrapperRef = useRef<HTMLDivElement>(null);
 
-
-  const loadReferences = useCallback(async () => {
-    setLoading(true);
-    const result = await db.references.where('workspaceId').equals(workspaceId!).toArray();
-    setReferences(
-      result.sort((a, b) => (a.sourceLessonNumber ?? 0) - (b.sourceLessonNumber ?? 0)),
-    );
-    setLoading(false);
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setSelectedId(null); setMobileReading(false); setQuery(''); setCourse('all');
+    if (workspaceId) void Promise.all([
+      db.references.where('workspaceId').equals(workspaceId).toArray(),
+      db.lessons.where('workspaceId').equals(workspaceId).toArray(),
+    ]).then(([refs, courses]) => {
+      if (!active) return;
+      setReferences(refs.sort((a, b) => (a.sourceLessonNumber ?? 0) - (b.sourceLessonNumber ?? 0)));
+      setLessons(courses); setLoading(false);
+    });
+    return () => { active = false; };
   }, [workspaceId]);
 
-  useEffect(() => {
-    if (workspaceId) void loadReferences();
-  }, [workspaceId, loadReferences]);
+  const texts = useMemo(() => new Map(references.map(ref => [ref.id, referenceText(ref.htmlContent)])), [references]);
+  const filtered = references.filter(ref => matchesLibraryCourse(course, ref.sourceLessonId)
+    && matchesLibrarySearch(query, ref.title, texts.get(ref.id), lessons.find(lesson => lesson.id === ref.sourceLessonId)?.title));
+  const selected = filtered.find(ref => ref.id === selectedId) || filtered[0];
+  const source = lessons.find(lesson => lesson.id === selected?.sourceLessonId);
+  function reset() { setQuery(''); setCourse('all'); setMobileReading(false); }
 
-  const handlePrint = () => {
-    const iframe = rendererWrapperRef.current?.querySelector('iframe');
-    iframe?.contentWindow?.print();
-  };
-
-  if (loading) {
-    return (
-      <div className="text-center py-16">
-        <div className="animate-spin w-6 h-6 border-2 border-[var(--color-accent)] border-t-transparent rounded-full mx-auto" />
-      </div>
-    );
-  }
-
-  if (selectedRef) {
-    return (
-      <div className="fade-in max-w-3xl">
-        <button
-          onClick={() => setSelectedRef(null)}
-          className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors inline-flex items-center gap-1 mb-3"
-        >
-          {t('backToReferences')}
-        </button>
-
-        <div className="flex items-start gap-3 mb-6">
-          {selectedRef.sourceLessonNumber != null && (
-            <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-accent-light)] px-2 py-0.5 rounded mt-1.5">
-              #{String(selectedRef.sourceLessonNumber).padStart(4, '0')}
-            </span>
-          )}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-[var(--color-text-heading)] break-words">
-              {selectedRef.title}
-            </h2>
-            <p className="text-sm text-[var(--color-text-muted)] mt-1">
-              {new Date(selectedRef.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-          <button
-            onClick={handlePrint}
-            className="px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-accent-light)] hover:border-[var(--color-accent-border)] transition-colors whitespace-nowrap"
-          >
-            {t('print')}
-          </button>
-        </div>
-
-        <div ref={rendererWrapperRef} className="rounded-xl overflow-hidden border border-[var(--color-border)] shadow-sm">
-          <LessonRenderer htmlContent={selectedRef.htmlContent} />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="py-16 text-center text-sm text-[var(--color-text-muted)]">{t('loading')}</div>;
 
   return (
-    <div className="fade-in max-w-2xl">
-      <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('referencesTitle')}</h2>
-      <p className="text-sm text-[var(--color-text-muted)] mb-6">{t('referencesDesc')}</p>
-
-      {references.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-3xl mb-2">📄</p>
-          <p className="text-[var(--color-text-muted)] mb-1">{t('noReferencesYet')}</p>
-          <p className="text-sm text-[var(--color-text-muted)]">{t('noReferencesHint')}</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {references.map(ref => (
-            <div
-              key={ref.id}
-              onClick={() => setSelectedRef(ref)}
-              className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-accent-border)] hover:shadow-sm cursor-pointer transition-all group"
-            >
-              <div className="flex items-start gap-3">
-                {ref.sourceLessonNumber != null && (
-                  <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-accent-light)] px-2 py-0.5 rounded mt-0.5">
-                    #{String(ref.sourceLessonNumber).padStart(4, '0')}
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[var(--color-text-heading)] group-hover:text-[var(--color-accent)] transition-colors truncate">
-                    {ref.title}
-                  </h3>
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                    {new Date(ref.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <span className="text-[var(--color-text-muted)] group-hover:text-[var(--color-accent)] transition-colors text-lg">
-                  →
-                </span>
+    <div className="fade-in max-w-5xl">
+      <h2 className="mb-1 text-2xl font-bold text-[var(--color-text-heading)]">{zh ? '速查资料' : 'Quick references'}</h2>
+      <p className="mb-6 text-sm text-[var(--color-text-muted)]">{zh ? '按课程查找速查资料，在目录中切换，随时回到来源课程。' : 'Find cheat-sheets by lesson, switch in the directory, and return to the source lesson.'}</p>
+      {references.length === 0 ? <div className="py-12 text-center text-[var(--color-text-muted)]"><p>{t('noReferencesYet')}</p><p className="mt-1 text-sm">{t('noReferencesHint')}</p></div> : <>
+        <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={value => { setCourse(value); setMobileReading(false); }} lessons={lessons} sourceIds={references.map(ref => ref.sourceLessonId)} count={filtered.length} total={references.length} onReset={reset} />
+        {!selected ? <LibraryNoResults onReset={reset} /> : <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
+          <nav aria-label={zh ? '速查资料目录' : 'Reference directory'} className={`${mobileReading ? 'hidden lg:block' : ''} space-y-2 lg:sticky lg:top-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto`}>
+            {filtered.map(ref => <button key={ref.id} type="button" onClick={() => { setSelectedId(ref.id); setMobileReading(true); }} aria-current={selected.id === ref.id ? 'page' : undefined} className={`w-full rounded-xl border p-3 text-left transition-colors ${selected.id === ref.id ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-light)]' : 'border-[var(--color-border)] bg-[var(--color-bg-card)] hover:border-[var(--color-accent-border)]'}`}>
+              <span className="mb-1 block text-[11px] text-[var(--color-text-muted)]">{ref.sourceLessonNumber != null ? `${zh ? '第' : 'Lesson '}${ref.sourceLessonNumber}${zh ? '课' : ''}` : (zh ? '速查资料' : 'Reference')}</span>
+              <span className="block break-words text-sm font-medium text-[var(--color-text-heading)]">{ref.title}</span>
+              <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]">{texts.get(ref.id)}</span>
+            </button>)}
+          </nav>
+          <article className={`${mobileReading ? '' : 'hidden lg:block'} min-w-0`}>
+            <button type="button" onClick={() => setMobileReading(false)} className="mb-3 text-sm text-[var(--color-accent)] lg:hidden">← {zh ? '返回目录' : 'Back to directory'}</button>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1"><h3 className="break-words text-xl font-semibold text-[var(--color-text-heading)]">{selected.title}</h3>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">{new Date(selected.createdAt).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US')}</p>
+                {source && <Link to={`/workspace/${workspaceId}/lesson/${source.id}`} className="mt-2 inline-block text-xs text-[var(--color-accent)] hover:underline">{zh ? '来源课程：' : 'Source lesson: '}{source.title} →</Link>}
               </div>
+              <button type="button" onClick={() => rendererWrapperRef.current?.querySelector('iframe')?.contentWindow?.print()} className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm hover:bg-[var(--color-accent-light)]">{t('print')}</button>
             </div>
-          ))}
-        </div>
-      )}
+            <div key={selected.id} ref={rendererWrapperRef} className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)]"><LessonRenderer htmlContent={selected.htmlContent} fitContent /></div>
+          </article>
+        </div>}
+      </>}
     </div>
   );
 }

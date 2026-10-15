@@ -2,38 +2,21 @@ import asyncio
 import logging
 import re
 from collections.abc import Iterable
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pymupdf as fitz
-from fastembed import TextEmbedding
 from sqlalchemy import delete, select
 
 from app.core.config import Settings
 from app.db.session import SessionFactory
 from app.models import KnowledgeChunk, KnowledgeSource
 from app.schemas.knowledge import KnowledgeSearchHit
+from app.services.embedding import EmbeddingError, collection_name
+from app.services.embedding import embed as _embed
 
 logger = logging.getLogger(__name__)
-
-
-@lru_cache(maxsize=2)
-def _embedding_model(model_name: str, cache_dir: str) -> TextEmbedding:
-    return TextEmbedding(model_name=model_name, cache_dir=cache_dir, threads=1, lazy_load=True)
-
-
-async def _embed(texts: list[str], settings: Settings) -> list[list[float]]:
-    def run() -> list[list[float]]:
-        return [
-            vector.tolist()
-            for vector in _embedding_model(
-                settings.embedding_model, settings.embedding_cache_dir
-            ).embed(texts)
-        ]
-
-    return await asyncio.to_thread(run)
 
 
 def _normalize_text(value: str) -> str:
@@ -94,7 +77,7 @@ def _meili_headers(settings: Settings) -> dict[str, str]:
 
 async def _ensure_indexes(settings: Settings, http: httpx.AsyncClient) -> None:
     qdrant = settings.qdrant_url.rstrip("/")
-    collection_url = f"{qdrant}/collections/{settings.qdrant_collection}"
+    collection_url = f"{qdrant}/collections/{collection_name(settings)}"
     response = await http.get(collection_url)
     if response.status_code == 404:
         response = await http.put(
@@ -109,6 +92,13 @@ async def _ensure_indexes(settings: Settings, http: httpx.AsyncClient) -> None:
             },
         )
     response.raise_for_status()
+    info = await http.get(collection_url)
+    info.raise_for_status()
+    if (
+        info.json()["result"]["config"]["params"]["vectors"]["size"]
+        != settings.embedding_dimensions
+    ):
+        raise EmbeddingError("Qdrant collection dimensions do not match embedding configuration")
 
     meili = settings.meilisearch_url.rstrip("/")
     headers = _meili_headers(settings)
@@ -132,8 +122,8 @@ async def _index_chunks(
 ) -> None:
     async with httpx.AsyncClient(timeout=60) as http:
         await _ensure_indexes(settings, http)
-        for start in range(0, len(chunks), 64):
-            batch = chunks[start : start + 64]
+        for start in range(0, len(chunks), settings.embedding_batch_size):
+            batch = chunks[start : start + settings.embedding_batch_size]
             vectors = await _embed([chunk.content for chunk in batch], settings)
             if vectors and len(vectors[0]) != settings.embedding_dimensions:
                 raise RuntimeError("Embedding model dimensions do not match configuration")
@@ -151,7 +141,7 @@ async def _index_chunks(
             ]
             response = await http.put(
                 f"{settings.qdrant_url.rstrip('/')}/collections/"
-                f"{settings.qdrant_collection}/points?wait=true",
+                f"{collection_name(settings)}/points?wait=true",
                 json={"points": points},
             )
             response.raise_for_status()
@@ -226,7 +216,7 @@ async def delete_external_chunks(source_id: str, settings: Settings) -> None:
         try:
             await http.post(
                 f"{settings.qdrant_url.rstrip('/')}/collections/"
-                f"{settings.qdrant_collection}/points/delete?wait=true",
+                f"{collection_name(settings)}/points/delete?wait=true",
                 json={"filter": {"must": [{"key": "source_id", "match": {"value": source_id}}]}},
             )
         except httpx.HTTPError:
@@ -251,12 +241,10 @@ async def search_knowledge(
             vector = (await _embed([query], settings))[0]
             response = await http.post(
                 f"{settings.qdrant_url.rstrip('/')}/collections/"
-                f"{settings.qdrant_collection}/points/search",
+                f"{collection_name(settings)}/points/search",
                 json={
                     "vector": vector,
-                    "filter": {
-                        "must": [{"key": "workspace_id", "match": {"value": workspace_id}}]
-                    },
+                    "filter": {"must": [{"key": "workspace_id", "match": {"value": workspace_id}}]},
                     "limit": limit * 3,
                     "with_payload": False,
                 },
@@ -266,7 +254,7 @@ async def search_knowledge(
                 entry = rankings.setdefault(str(point["id"]), {"score": 0.0, "matched_by": []})
                 entry["score"] += 1 / (60 + rank)
                 entry["matched_by"].append("semantic")
-        except (httpx.HTTPError, KeyError, ValueError, IndexError):
+        except (httpx.HTTPError, KeyError, ValueError, IndexError, EmbeddingError):
             logger.warning("Semantic knowledge search unavailable", exc_info=True)
         try:
             response = await http.post(

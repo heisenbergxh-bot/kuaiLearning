@@ -25,7 +25,9 @@ from app.core.config import Settings, get_settings
 from app.core.current_user import CurrentUserDependency
 from app.db.session import get_db_session
 from app.models import KnowledgeSource
+from app.models.entities import EmbeddingConfiguration
 from app.schemas.knowledge import KnowledgeSearchHit, KnowledgeSourceResponse
+from app.services.embedding_configuration import effective_embedding_settings
 from app.services.knowledge import delete_external_chunks, process_source, search_knowledge
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/knowledge", tags=["knowledge"])
@@ -95,6 +97,9 @@ async def upload_source(
     if source_type not in ALLOWED_SOURCE_TYPES:
         raise HTTPException(422, "不支持的资料类型")
 
+    await session.get(EmbeddingConfiguration, 1, with_for_update=True)
+    settings = await effective_embedding_settings(session, settings)
+
     source_id = str(uuid4())
     upload_dir = Path(settings.knowledge_upload_dir) / workspace_id
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -149,6 +154,8 @@ async def retry_source(
     source = await _source_for_user(workspace_id, source_id, user.subject, session)
     if source.status in {"pending", "processing"}:
         return source
+    await session.get(EmbeddingConfiguration, 1, with_for_update=True)
+    settings = await effective_embedding_settings(session, settings)
     source.status = "pending"
     source.error_message = None
     await session.commit()
@@ -184,6 +191,7 @@ async def delete_source(
     await _require_workspace(workspace_id, user, session)
     source = await _source_for_user(workspace_id, source_id, user.subject, session)
     path = Path(source.storage_path)
+    settings = await effective_embedding_settings(session, settings)
     await session.delete(source)
     await session.commit()
     await asyncio.to_thread(path.unlink, missing_ok=True)
@@ -201,4 +209,5 @@ async def search_sources(
     limit: Annotated[int, Query(ge=1, le=20)] = 8,
 ) -> list[KnowledgeSearchHit]:
     await _require_workspace(workspace_id, user, session)
+    settings = await effective_embedding_settings(session, settings)
     return await search_knowledge(workspace_id, q.strip(), limit, settings)

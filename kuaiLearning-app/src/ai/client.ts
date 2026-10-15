@@ -11,6 +11,7 @@ import { db } from '../db';
 import { readChatCompletionStream } from './streaming';
 import { fetchCompletion } from './request';
 import { knowledgeContext, searchKnowledge } from '../api/knowledge';
+import type { LessonGenerationPhase } from '../lib/generationProgress';
 
 type AIStreamCallback = (chunk: string) => void;
 
@@ -130,6 +131,7 @@ export async function generateLessonStream(
   userRequest?: string,
   onChunk?: (chunk: string) => void,
   targetItemId?: string,
+  onPhase?: (phase: LessonGenerationPhase) => void,
 ): Promise<AIGenerateLessonResponse> {
   const workspace = await db.workspaces.get(workspaceId);
   if (!workspace) throw new Error('Workspace not found');
@@ -150,6 +152,7 @@ export async function generateLessonStream(
     syllabus, targetItem, knowledgeContext(hits),
   );
 
+  onPhase?.('waiting');
   const response = await fetchCompletion(workspaceId, {
     method: 'POST',
     headers: {
@@ -172,8 +175,16 @@ export async function generateLessonStream(
   }
 
   if (!response.body) throw new Error('No response body');
-  const fullContent = await readChatCompletionStream(response.body, onChunk, true);
+  let receivedContent = false;
+  const fullContent = await readChatCompletionStream(response.body, chunk => {
+    if (!receivedContent && chunk) {
+      receivedContent = true;
+      onPhase?.('generating');
+    }
+    onChunk?.(chunk);
+  }, true);
 
+  onPhase?.('validating');
   return parseLessonResponse(fullContent);
 }
 

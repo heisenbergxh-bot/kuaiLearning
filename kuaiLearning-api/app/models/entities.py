@@ -26,6 +26,17 @@ class AIConfiguration(Base):
     encrypted_api_key: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class EmbeddingConfiguration(Base):
+    __tablename__ = "embedding_configuration"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    encrypted_api_key: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class LearningWorkspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "learning_workspaces"
     __table_args__ = (Index("ix_workspace_owner_updated", "owner_subject", "updated_at"),)

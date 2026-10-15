@@ -7,15 +7,20 @@ import type { ChatMessage } from '../types';
 
 interface ChatPanelProps {
   lessonId: string;
+  floating?: boolean;
+  active?: boolean;
+  lessonTitle?: string;
+  onClose?: () => void;
 }
 
-export function ChatPanel({ lessonId }: ChatPanelProps) {
+export function ChatPanel({ lessonId, floating = false, active = true, lessonTitle, onClose }: ChatPanelProps) {
   const { settings } = useSettingsStore();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [loadingMessages, setLoadingMessages] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -27,7 +32,7 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
     if (messages.length === 0) return;
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, active, sending]);
 
   const loadMessages = useCallback(async () => {
     const msgs = await db.chatMessages
@@ -35,17 +40,25 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
       .equals(lessonId)
       .sortBy('createdAt');
     setMessages(msgs);
+    setLoadingMessages(false);
   }, [lessonId]);
 
   useEffect(() => {
-    void loadMessages();
+    void loadMessages().catch(reason => {
+      setError(reason instanceof Error ? reason.message : 'Failed to load messages');
+      setLoadingMessages(false);
+    });
   }, [loadMessages]);
+
+  useEffect(() => {
+    if (floating && active && !sending && !loadingMessages) inputRef.current?.focus({ preventScroll: true });
+  }, [floating, active, sending, loadingMessages]);
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text || sending || loadingMessages) return;
 
-    setInput('');
+    setSending(true);
     setError('');
 
     const userMsg: ChatMessage = {
@@ -56,11 +69,10 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
       createdAt: Date.now(),
     };
 
-    await db.chatMessages.add(userMsg);
-    setMessages(prev => [...prev, userMsg]);
-    setSending(true);
-
     try {
+      await db.chatMessages.add(userMsg);
+      setMessages(prev => [...prev, userMsg]);
+      setInput('');
       const reply = await chatWithAI(settings, lessonId, messages, text);
 
       const assistantMsg: ChatMessage = {
@@ -81,13 +93,14 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSend();
     }
   };
 
   const handleClear = async () => {
+    if (sending || loadingMessages) return;
     if (confirm(t('clearChatConfirm'))) {
       await db.chatMessages.where('lessonId').equals(lessonId).delete();
       setMessages([]);
@@ -95,25 +108,31 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
   };
 
   return (
-    <div className="border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-card)] overflow-hidden">
+    <div className={`${floating ? 'flex h-full min-h-0 flex-col' : ''} border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-card)] overflow-hidden`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-accent-light)]/30">
-        <h3 className="text-sm font-semibold text-[var(--color-text-heading)]">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-accent-light)]/30">
+        <div className="min-w-0"><h3 className="text-sm font-semibold text-[var(--color-text-heading)]">
           💬 {t('chatTitle')}
         </h3>
+        {lessonTitle && <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]" title={lessonTitle}>{lang === 'zh' ? '本课：' : 'Lesson: '}{lessonTitle}</p>}</div>
+        <div className="flex shrink-0 items-center gap-3">
         {messages.length > 0 && (
           <button
             onClick={handleClear}
+            disabled={sending || loadingMessages}
             className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
           >
             {t('clearChat')}
           </button>
         )}
+        {onClose && <button type="button" onClick={onClose} aria-label={lang === 'zh' ? '收起 AI 老师' : 'Minimize AI teacher'} className="rounded-lg px-2 py-1 text-lg text-[var(--color-text-muted)] hover:bg-[var(--color-accent-light)]">×</button>}
+        </div>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="h-64 overflow-y-auto px-4 py-3 space-y-3">
-        {messages.length === 0 && !sending && (
+      <div ref={scrollRef} role="log" aria-label={lang === 'zh' ? '本课聊天记录' : 'Lesson chat messages'} aria-live="polite" className={`${floating ? 'min-h-0 flex-1' : 'h-64'} overflow-y-auto overscroll-contain px-4 py-3 space-y-3`}>
+        {loadingMessages && <p className="text-sm text-[var(--color-text-muted)]">{t('loading')}</p>}
+        {messages.length === 0 && !sending && !loadingMessages && (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <p className="text-2xl mb-2">🤔</p>
             <p className="text-sm text-[var(--color-text-muted)] mb-1">{t('chatEmpty')}</p>
@@ -139,7 +158,7 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
         ))}
 
         {sending && (
-          <div className="flex justify-start">
+          <div className="flex justify-start" role="status" aria-label={lang === 'zh' ? 'AI 老师正在回答' : 'AI teacher is replying'}>
             <div className="max-w-[80%] px-3.5 py-2.5 rounded-2xl rounded-bl-md bg-[var(--color-accent-light)]/50 text-[var(--color-text)] border border-[var(--color-border)]">
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-[var(--color-accent)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -152,13 +171,13 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
 
         {error && (
           <div className="text-center">
-            <p className="text-xs text-[var(--color-danger)]">{error}</p>
+            <p role="alert" className="text-xs text-[var(--color-danger)]">{error}</p>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--color-border)] px-3 py-2.5 flex gap-2">
+      <div className="shrink-0 border-t border-[var(--color-border)] px-3 py-2.5 flex gap-2">
         <input
           ref={inputRef}
           type="text"
@@ -166,12 +185,13 @@ export function ChatPanel({ lessonId }: ChatPanelProps) {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('chatPlaceholder')}
-          disabled={sending}
-          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent-border)] transition-all disabled:opacity-50"
+          aria-label={t('chatPlaceholder')}
+          disabled={sending || loadingMessages}
+          className="min-w-0 flex-1 px-3 py-1.5 text-base sm:text-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:border-[var(--color-accent-border)] transition-all disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={sending || !input.trim()}
+          disabled={sending || loadingMessages || !input.trim()}
           className="px-4 py-1.5 bg-[var(--color-accent)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? '...' : t('send')}

@@ -5,6 +5,8 @@ import type { AIGenerateLessonResponse, Settings, Workspace } from '../types';
 import { db } from '../db';
 import { generateLessonStream } from '../ai/client';
 import { generateAndSaveLesson } from './lessonGen';
+import * as learningSync from '../api/learningContentSync';
+import type { LessonGenerationPhase } from './generationProgress';
 
 vi.mock('../ai/client', () => ({
   generateLessonStream: vi.fn(),
@@ -51,6 +53,7 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   await db.transaction('rw', db.tables, async () => {
     await Promise.all(db.tables.map(table => table.clear()));
   });
@@ -59,6 +62,38 @@ beforeEach(async () => {
 });
 
 describe('generateAndSaveLesson', () => {
+  it('reports completion only after persistence and cloud sync finish', async () => {
+    const phases: LessonGenerationPhase[] = [];
+    vi.mocked(generateLessonStream).mockImplementationOnce(async (
+      _settings, _workspaceId, _request, onChunk, _target, onPhase,
+    ) => {
+      onPhase?.('waiting');
+      onPhase?.('generating');
+      onChunk?.('lesson content');
+      onPhase?.('validating');
+      return generatedLesson;
+    });
+    vi.spyOn(learningSync, 'pushLocalLesson').mockImplementationOnce(async lesson => {
+      expect(phases.at(-1)).toBe('syncing');
+      expect(await db.lessons.get(lesson.id)).toBeDefined();
+      return lesson;
+    });
+    const onChunk = vi.fn();
+    await generateAndSaveLesson(settings, workspace.id, { onPhase: phase => phases.push(phase), onChunk });
+    expect(phases).toEqual(['preparing', 'waiting', 'generating', 'validating', 'saving', 'syncing', 'done']);
+    expect(onChunk).toHaveBeenCalledWith('lesson content');
+  });
+
+  it('reports a usable local lesson when cloud sync fails', async () => {
+    const phases: LessonGenerationPhase[] = [];
+    vi.spyOn(learningSync, 'pushLocalLesson').mockRejectedValueOnce(new Error('network unavailable'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const lesson = await generateAndSaveLesson(settings, workspace.id, { onPhase: phase => phases.push(phase) });
+    expect(phases.at(-1)).toBe('local-only');
+    expect(phases).not.toContain('done');
+    expect(await db.lessons.get(lesson.id)).toBeDefined();
+  });
+
   it('persists a lesson and all derived records together', async () => {
     await generateAndSaveLesson(settings, workspace.id);
 
@@ -71,9 +106,12 @@ describe('generateAndSaveLesson', () => {
   });
 
   it('rolls every write back when a derived record fails', async () => {
+    const onPhase = vi.fn();
     vi.spyOn(db.glossaryTerms, 'add').mockRejectedValueOnce(new Error('write failed'));
 
-    await expect(generateAndSaveLesson(settings, workspace.id)).rejects.toThrow('write failed');
+    await expect(generateAndSaveLesson(settings, workspace.id, { onPhase })).rejects.toThrow('write failed');
+    expect(onPhase).not.toHaveBeenCalledWith('done');
+    expect(onPhase).not.toHaveBeenCalledWith('local-only');
     await expect(db.lessons.count()).resolves.toBe(0);
     await expect(db.quizQuestions.count()).resolves.toBe(0);
     await expect(db.learningRecords.count()).resolves.toBe(0);

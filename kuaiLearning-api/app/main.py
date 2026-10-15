@@ -20,7 +20,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def safe_validation_error(request: Request, exc: RequestValidationError) -> Response:
-        if request.url.path.rstrip("/") == "/api/v1/settings/ai":
+        if request.url.path.rstrip("/") in {
+            "/api/v1/settings/ai",
+            "/api/v1/settings/embedding",
+            "/api/v1/settings/embedding/test",
+        }:
             return JSONResponse(
                 status_code=422,
                 content={

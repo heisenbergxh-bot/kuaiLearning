@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from '../i18n/useTranslation';
-import type { LearningRecord } from '../types';
+import type { LearningRecord, Lesson } from '../types';
 import { db, generateId } from '../db';
+import { LibraryTools, LibraryNoResults } from '../components/LibraryTools';
+import { localDayKey, matchesLibraryCourse, matchesLibrarySearch } from '../lib/libraryView';
 
 export function LearningRecordsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -13,17 +15,26 @@ export function LearningRecordsPage() {
   const [content, setContent] = useState('');
   const [evidence, setEvidence] = useState('');
   const [implications, setImplications] = useState('');
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [query, setQuery] = useState('');
+  const [course, setCourse] = useState('all');
+  const resetFilters = () => { setQuery(''); setCourse('all'); };
 
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
-    const result = await db.learningRecords.where('workspaceId').equals(workspaceId!).toArray();
-    setRecords(result.sort((a, b) => b.number - a.number));
+    const [result, courses] = await Promise.all([
+      db.learningRecords.where('workspaceId').equals(workspaceId!).toArray(),
+      db.lessons.where('workspaceId').equals(workspaceId!).toArray(),
+    ]);
+    setRecords(result.sort((a, b) => b.createdAt - a.createdAt || b.number - a.number));
+    setLessons(courses);
     setLoading(false);
   }, [workspaceId]);
 
   useEffect(() => {
+    setQuery(''); setCourse('all'); setShowForm(false);
     if (workspaceId) void loadRecords();
   }, [workspaceId, loadRecords]);
 
@@ -50,6 +61,7 @@ export function LearningRecordsPage() {
     setEvidence('');
     setImplications('');
     setShowForm(false);
+    resetFilters();
     await loadRecords();
   };
 
@@ -60,6 +72,20 @@ export function LearningRecordsPage() {
     }
   };
 
+  const filtered = records.filter(record => matchesLibraryCourse(course, record.sourceLessonId)
+    && matchesLibrarySearch(query, record.title, record.content, record.evidence, record.implications, lessons.find(lesson => lesson.id === record.sourceLessonId)?.title));
+  const groups = filtered.reduce((result, record) => {
+    (result[localDayKey(record.createdAt)] ||= []).push(record);
+    return result;
+  }, {} as Record<string, LearningRecord[]>);
+  const today = localDayKey(Date.now());
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  function dayLabel(key: string, timestamp: number) {
+    const date = new Date(timestamp).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const prefix = key === today ? (lang === 'zh' ? '今天' : 'Today') : key === localDayKey(yesterday.getTime()) ? (lang === 'zh' ? '昨天' : 'Yesterday') : '';
+    return prefix ? `${prefix} · ${date}` : date;
+  }
+
   if (loading) {
     return (
       <div className="text-center py-16">
@@ -69,19 +95,21 @@ export function LearningRecordsPage() {
   }
 
   return (
-    <div className="fade-in max-w-2xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="fade-in max-w-4xl">
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('recordsTitle')}</h2>
           <p className="text-sm text-[var(--color-text-muted)]">{t('recordsDesc')}</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors"
+          className="shrink-0 whitespace-nowrap px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-accent-light)] transition-colors"
         >
           {showForm ? t('cancel') : t('addRecord')}
         </button>
       </div>
+
+      {records.length > 0 && <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={setCourse} lessons={lessons} sourceIds={records.map(record => record.sourceLessonId)} count={filtered.length} total={records.length} onReset={resetFilters} />}
 
       {showForm && (
         <div className="mb-6 p-4 rounded-xl border border-[var(--color-accent-border)] bg-[var(--color-bg-card)] space-y-3">
@@ -128,50 +156,41 @@ export function LearningRecordsPage() {
           <p className="text-[var(--color-text-muted)]">{t('noRecordsYet')}</p>
           <p className="text-sm text-[var(--color-text-muted)]">{t('noRecordsHint')}</p>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {records.map(record => (
-            <div
-              key={record.id}
-              className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] group"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-accent-light)] px-2 py-0.5 rounded">
-                      LR-{String(record.number).padStart(4, '0')}
-                    </span>
-                    {record.status && record.status !== 'active' && (
-                      <span className="text-xs bg-[var(--color-warning-bg)] text-[var(--color-warning)] px-2 py-0.5 rounded">
-                        {record.status}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-[var(--color-text-heading)]">{record.title}</h3>
-                  <p className="text-sm text-[var(--color-text)] mt-1">{record.content}</p>
-                  {record.evidence && (
-                    <p className="text-xs text-[var(--color-text-muted)] mt-2">
-                      <span className="font-medium">{t('evidence')}:</span> {record.evidence}
-                    </p>
-                  )}
-                  {record.implications && (
-                    <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                      <span className="font-medium">{t('implications')}:</span> {record.implications}
-                    </p>
-                  )}
-                  <p className="text-xs text-[var(--color-text-muted)] mt-2">
-                    {new Date(record.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDelete(record.id)}
-                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 text-xs text-[var(--color-danger)] px-2 py-1 transition-opacity"
-                >
-                  {t('delete')}
-                </button>
-              </div>
+      ) : records.length > 0 && filtered.length === 0 ? <LibraryNoResults onReset={resetFilters} /> : (
+        <div className="space-y-7">
+          {Object.entries(groups).map(([day, items]) => <section key={day} aria-label={dayLabel(day, items[0].createdAt)}>
+            <h3 className="mb-3 text-sm font-semibold text-[var(--color-text-heading)]">{dayLabel(day, items[0].createdAt)} <span className="ml-2 text-xs font-normal text-[var(--color-text-muted)]">{items.length} {lang === 'zh' ? '条记录' : 'records'}</span></h3>
+            <div className="ml-2 space-y-3 border-l border-[var(--color-border)] pl-5">
+              {items.map(record => {
+                const source = lessons.find(lesson => lesson.id === record.sourceLessonId);
+                return <article key={record.id} className="relative rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-card)] p-4">
+                  <span aria-hidden="true" className="absolute -left-6 top-6 h-2 w-2 rounded-full bg-[var(--color-accent)]" />
+                  <details className="group/record">
+                    <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                        <span>{new Date(record.createdAt).toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="rounded-full bg-[var(--color-accent-light)] px-2 py-0.5 text-[var(--color-accent)]">{record.sourceLessonId ? (lang === 'zh' ? '课程学习总结' : 'Lesson summary') : (lang === 'zh' ? '手动记录' : 'Personal note')}</span>
+                        <span>LR-{String(record.number).padStart(4, '0')}</span>
+                        {record.status && record.status !== 'active' && <span className="text-[var(--color-warning)]">{record.status}</span>}
+                      </div>
+                      <h4 className="break-words font-semibold text-[var(--color-text-heading)]">{record.title}</h4>
+                      <p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text-muted)] group-open/record:hidden">{record.content}</p>
+                      <span className="mt-2 block text-[11px] text-[var(--color-accent)]"><span className="group-open/record:hidden">{lang === 'zh' ? '展开完整记录 ↓' : 'Show full record ↓'}</span><span className="hidden group-open/record:inline">{lang === 'zh' ? '收起记录 ↑' : 'Hide record ↑'}</span></span>
+                    </summary>
+                    <div className="mt-4 space-y-4 border-t border-[var(--color-border)] pt-4">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--color-text)]">{record.content}</p>
+                      {record.evidence && <div className="rounded-lg bg-[var(--color-bg-subtle)] p-3"><h5 className="mb-1 text-xs font-semibold text-[var(--color-text-heading)]">{t('evidence')}</h5><p className="whitespace-pre-wrap break-words text-sm text-[var(--color-text)]">{record.evidence}</p></div>}
+                      {record.implications && <div className="rounded-lg bg-[var(--color-accent-light)] p-3"><h5 className="mb-1 text-xs font-semibold text-[var(--color-text-heading)]">{t('implications')}</h5><p className="whitespace-pre-wrap break-words text-sm text-[var(--color-text)]">{record.implications}</p></div>}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        {source && <Link to={`/workspace/${workspaceId}/lesson/${source.id}`} className="text-xs text-[var(--color-accent)] hover:underline">{lang === 'zh' ? '来源课程：' : 'Source lesson: '}{source.title} →</Link>}
+                        <button type="button" onClick={() => handleDelete(record.id)} className="text-xs text-[var(--color-danger)]">{t('delete')}</button>
+                      </div>
+                    </div>
+                  </details>
+                </article>;
+              })}
             </div>
-          ))}
+          </section>)}
         </div>
       )}
     </div>
