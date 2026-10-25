@@ -6,7 +6,12 @@ import { db } from '../db';
 import { generateLessonStream } from '../ai/client';
 import { generateAndSaveLesson } from './lessonGen';
 import * as learningSync from '../api/learningContentSync';
+import { synchronizeLibrary } from '../api/librarySync';
 import type { LessonGenerationPhase } from './generationProgress';
+
+vi.mock('../api/librarySync', () => ({
+  synchronizeLibrary: vi.fn(async (_workspaceId: string, beforeSync?: () => Promise<void>) => { await beforeSync?.(); }),
+}));
 
 vi.mock('../ai/client', () => ({
   generateLessonStream: vi.fn(),
@@ -103,6 +108,22 @@ describe('generateAndSaveLesson', () => {
     await expect(db.learningRecords.count()).resolves.toBe(1);
     await expect(db.references.count()).resolves.toBe(1);
     await expect(db.resources.count()).resolves.toBe(1);
+  });
+
+  it('does not report cloud completion when only the derived item upload fails', async () => {
+    const phases: LessonGenerationPhase[] = [];
+    vi.spyOn(learningSync, 'pushLocalLesson').mockImplementationOnce(async lesson => lesson);
+    vi.mocked(synchronizeLibrary).mockImplementationOnce(async (_id, beforeSync) => {
+      await beforeSync?.();
+      throw new Error('references upload unavailable');
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await generateAndSaveLesson(settings, workspace.id, { onPhase: phase => phases.push(phase) });
+    expect(phases.at(-1)).toBe('local-only');
+    expect(phases).not.toContain('done');
+    await expect(db.references.count()).resolves.toBe(1);
+    await expect(db.glossaryTerms.count()).resolves.toBe(1);
+    await expect(db.learningRecords.count()).resolves.toBe(1);
   });
 
   it('rolls every write back when a derived record fails', async () => {

@@ -9,6 +9,7 @@ from app.api.routes import (
     identity,
     knowledge,
     learning_content,
+    library,
     workspaces,
 )
 
@@ -21,4 +22,5 @@ api_router.include_router(health.router)
 api_router.include_router(identity.router)
 api_router.include_router(workspaces.router)
 api_router.include_router(learning_content.router)
+api_router.include_router(library.router)
 api_router.include_router(knowledge.router)

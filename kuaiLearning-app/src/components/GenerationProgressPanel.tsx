@@ -38,7 +38,7 @@ export function GenerationProgressPanel({ progress, onOpen, onDismiss }: Props) 
   const steps = zh ? ['准备资料', '编写课程', '整理练习', '保存课程']
     : ['Prepare', 'Write', 'Organize', 'Save'];
   const description = failed ? progress.error : progress.phase === 'local-only'
-    ? (zh ? '云端同步暂未完成，可以先阅读；稍后会重试同步。' : 'Cloud sync is pending. You can read now and sync later.')
+    ? (zh ? '课程或配套资料的云端同步尚未完成，可以先阅读；回到课程页后会重试同步。' : 'Cloud sync for the lesson or its supporting content is pending. Return to the lessons page to retry.')
     : active ? (seconds >= 60
       ? (zh ? '内容较长，生成仍在进行中。请保持页面打开，避免重复生成。' : 'Longer lessons take time. Keep this page open and avoid starting again.')
       : (zh ? '课程和配套练习会一起生成，请保持页面打开。' : 'The lesson and exercises are generated together. Keep this page open.'))

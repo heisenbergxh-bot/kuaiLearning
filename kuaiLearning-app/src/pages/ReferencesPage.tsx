@@ -6,6 +6,8 @@ import { matchesLibraryCourse, matchesLibrarySearch, referenceText } from '../li
 import { useTranslation } from '../i18n/useTranslation';
 import type { Reference, Lesson } from '../types';
 import { db } from '../db';
+import { LibrarySyncNotice } from '../components/LibrarySyncProvider';
+import { useLibrarySync } from '../lib/librarySyncContext';
 
 export function ReferencesPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -19,10 +21,14 @@ export function ReferencesPage() {
   const { t, lang } = useTranslation();
   const zh = lang === 'zh';
   const rendererWrapperRef = useRef<HTMLDivElement>(null);
+  const librarySync = useLibrarySync();
+
+  useEffect(() => {
+    setLoading(true); setSelectedId(null); setMobileReading(false); setQuery(''); setCourse('all');
+  }, [workspaceId]);
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setSelectedId(null); setMobileReading(false); setQuery(''); setCourse('all');
     if (workspaceId) void Promise.all([
       db.references.where('workspaceId').equals(workspaceId).toArray(),
       db.lessons.where('workspaceId').equals(workspaceId).toArray(),
@@ -32,7 +38,7 @@ export function ReferencesPage() {
       setLessons(courses); setLoading(false);
     });
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, librarySync.revision]);
 
   const texts = useMemo(() => new Map(references.map(ref => [ref.id, referenceText(ref.htmlContent)])), [references]);
   const filtered = references.filter(ref => matchesLibraryCourse(course, ref.sourceLessonId)
@@ -47,6 +53,7 @@ export function ReferencesPage() {
     <div className="fade-in max-w-5xl">
       <h2 className="mb-1 text-2xl font-bold text-[var(--color-text-heading)]">{zh ? '速查资料' : 'Quick references'}</h2>
       <p className="mb-6 text-sm text-[var(--color-text-muted)]">{zh ? '按课程查找速查资料，在目录中切换，随时回到来源课程。' : 'Find cheat-sheets by lesson, switch in the directory, and return to the source lesson.'}</p>
+      <LibrarySyncNotice />
       {references.length === 0 ? <div className="py-12 text-center text-[var(--color-text-muted)]"><p>{t('noReferencesYet')}</p><p className="mt-1 text-sm">{t('noReferencesHint')}</p></div> : <>
         <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={value => { setCourse(value); setMobileReading(false); }} lessons={lessons} sourceIds={references.map(ref => ref.sourceLessonId)} count={filtered.length} total={references.length} onReset={reset} />
         {!selected ? <LibraryNoResults onReset={reset} /> : <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">

@@ -247,3 +247,21 @@ location /api/ {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 }
 ```
+
+
+## 速查资料、术语与学习记录同步
+
+部署后执行 `alembic upgrade head`，最新迁移 `20261025_0008` 新建 `library_items` 表。
+已有课程和上传资料保持原样；浏览器原有的 references、glossaryTerms、learningRecords
+在用户进入所属工作区时自动补传，ID 和来源课程信息保留。其他设备登录同一账号后自动下载。
+服务器无法主动获取尚未打开新版页面的旧浏览器数据。
+
+- `GET /api/v1/workspaces/{workspace_id}/library/{kind}`：按 ID 游标分页，`limit` 默认 200、最大 500，返回 `items` 和 `next_cursor`，包含删除标记。
+- `PUT /api/v1/workspaces/{workspace_id}/library/{kind}/{entry_id}`：提交 `content_payload` 和 `client_updated_at_ms`，校验内容类型和来源课程归属，旧版本写入不会覆盖新版本。
+- `DELETE /api/v1/workspaces/{workspace_id}/library/{kind}/{entry_id}`：保留删除标记，阻止旧浏览器恢复已删除内容；删除课程也标记删除其派生资料。
+
+`kind` 为 `references`、`glossary`、`records`。所有接口要求登录且拥有工作区；
+写操作沿用同源校验。前端串行同步同一工作区，先同步课程与大纲，再同步配套资料；
+进入工作区/切换页面、回到浏览器窗口、网络恢复时重试，并显示成功或失败状态。
+手工新增术语和学习记录也会同步；删除需服务器确认后才移除本机副本。
+题库练习、聊天和外部链接不属于本次同步范围。

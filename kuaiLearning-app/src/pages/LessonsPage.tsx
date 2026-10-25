@@ -8,7 +8,8 @@ import { SyllabusRoadmap } from '../components/SyllabusRoadmap';
 import type { Lesson, SyllabusItem } from '../types';
 import { db } from '../db';
 import { generateRemoteSyllabus, syllabusItemFromRemote } from '../api/learningContent';
-import { synchronizeLearningContent } from '../api/learningContentSync';
+import { LibrarySyncNotice } from '../components/LibrarySyncProvider';
+import { useLibrarySync } from '../lib/librarySyncContext';
 import { listKnowledgeSources, type KnowledgeSource } from '../api/knowledge';
 import { AppIcon, type AppIconName } from '../components/AppIcon';
 import { GenerationProgressPanel } from '../components/GenerationProgressPanel';
@@ -30,6 +31,7 @@ export function LessonsPage() {
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
   const generation = useGenerationProgress();
   const [generatingItemId, setGeneratingItemId] = useState<string>();
+  const librarySync = useLibrarySync();
 
 
   const loadLessons = useCallback(async () => {
@@ -51,15 +53,11 @@ export function LessonsPage() {
 
   useEffect(() => {
     if (workspaceId) {
-      void synchronizeLearningContent(workspaceId)
-        .catch(reason => console.warn('Learning content sync failed.', reason))
-        .finally(() => {
-          void loadLessons();
-          void loadSyllabus();
-        });
+      void loadLessons();
+      void loadSyllabus();
       void loadKnowledgeSources().catch(reason => console.warn('Knowledge source loading failed.', reason));
     }
-  }, [workspaceId, loadLessons, loadSyllabus, loadKnowledgeSources]);
+  }, [workspaceId, loadLessons, loadSyllabus, loadKnowledgeSources, librarySync.revision]);
 
   useEffect(() => {
     if (!knowledgeSources.some(source => source.status === 'pending' || source.status === 'processing')) return;
@@ -110,6 +108,7 @@ export function LessonsPage() {
         onPhase: generation.onPhase,
       });
       generation.finish(lesson.id);
+      void librarySync.refresh();
       await loadLessons();
       await loadSyllabus();
     } catch (err: any) {
@@ -138,6 +137,7 @@ export function LessonsPage() {
     <div className="fade-in max-w-4xl">
       <h2 className="text-2xl font-bold text-[var(--color-text-heading)] mb-1">{t('lessonsTitle')}</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-6">{t('lessonsDesc')}</p>
+      <LibrarySyncNotice />
 
       <CourseSourcesPanel
         sources={knowledgeSources}

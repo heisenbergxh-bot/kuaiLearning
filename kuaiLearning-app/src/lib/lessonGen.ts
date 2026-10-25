@@ -5,6 +5,7 @@ import { db, deleteLocalLessonData, generateId } from '../db';
 import { deleteRemoteLesson } from '../api/learningContent';
 import { pushLocalLesson, pushLocalSyllabusItem } from '../api/learningContentSync';
 import type { LessonGenerationPhase } from './generationProgress';
+import { synchronizeLibrary } from '../api/librarySync';
 
 interface GenerateOpts {
   targetItem?: SyllabusItem;
@@ -155,11 +156,14 @@ export async function generateAndSaveLesson(
 
   onPhase?.('syncing');
   try {
-    const synchronizedLesson = await pushLocalLesson(lesson);
-    if (targetItem) {
-      const synchronizedItem = await db.syllabusItems.get(targetItem.id);
-      if (synchronizedItem) await pushLocalSyllabusItem(synchronizedItem);
-    }
+    let synchronizedLesson = lesson;
+    await synchronizeLibrary(workspaceId, async () => {
+      synchronizedLesson = await pushLocalLesson(lesson);
+      if (targetItem) {
+        const synchronizedItem = await db.syllabusItems.get(targetItem.id);
+        if (synchronizedItem) await pushLocalSyllabusItem(synchronizedItem);
+      }
+    });
     onPhase?.('done');
     return synchronizedLesson;
   } catch (reason) {

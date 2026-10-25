@@ -6,6 +6,8 @@ import type { GlossaryTerm, Lesson } from '../types';
 import { db, generateId } from '../db';
 import { LibraryTools, LibraryNoResults, libraryInputClass } from '../components/LibraryTools';
 import { matchesLibraryCourse, matchesLibrarySearch } from '../lib/libraryView';
+import { LibrarySyncNotice } from '../components/LibrarySyncProvider';
+import { useLibrarySync } from '../lib/librarySyncContext';
 
 export function GlossaryPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -22,10 +24,10 @@ export function GlossaryPage() {
   const [course, setCourse] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const resetFilters = () => { setQuery(''); setCourse('all'); setCategoryFilter('all'); };
+  const librarySync = useLibrarySync();
 
 
   const loadTerms = useCallback(async () => {
-    setLoading(true);
     const [result, courses] = await Promise.all([
       db.glossaryTerms.where('workspaceId').equals(workspaceId!).toArray(),
       db.lessons.where('workspaceId').equals(workspaceId!).toArray(),
@@ -37,8 +39,11 @@ export function GlossaryPage() {
 
   useEffect(() => {
     setQuery(''); setCourse('all'); setCategoryFilter('all'); setShowForm(false);
+  }, [workspaceId]);
+
+  useEffect(() => {
     if (workspaceId) void loadTerms();
-  }, [workspaceId, loadTerms]);
+  }, [workspaceId, loadTerms, librarySync.revision]);
 
   const handleCreate = async () => {
     if (!workspaceId || !term.trim() || !definition.trim()) return;
@@ -58,12 +63,12 @@ export function GlossaryPage() {
     setShowForm(false);
     resetFilters();
     await loadTerms();
+    await librarySync.refresh();
   };
 
   const handleDelete = async (id: string) => {
     if (confirm(t('deleteTermConfirm'))) {
-      await db.glossaryTerms.delete(id);
-      await loadTerms();
+      if (await librarySync.remove('glossary', id)) await loadTerms();
     }
   };
 
@@ -100,6 +105,7 @@ export function GlossaryPage() {
         </button>
       </div>
 
+      <LibrarySyncNotice />
       {terms.length > 0 && <>
         <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={setCourse} lessons={lessons} sourceIds={terms.map(term => term.sourceLessonId)} count={filtered.length} total={terms.length} onReset={resetFilters} />
         <div className="mb-5 flex flex-wrap items-center gap-2"><label htmlFor="glossary-category" className="text-xs text-[var(--color-text-muted)]">{lang === 'zh' ? '术语分类' : 'Category'}</label>

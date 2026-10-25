@@ -11,6 +11,8 @@ import { db } from '../db';
 import { updateLocalLessonAndSync } from '../api/learningContentSync';
 import { GenerationProgressPanel } from '../components/GenerationProgressPanel';
 import { useGenerationProgress } from '../lib/useGenerationProgress';
+import { LibrarySyncNotice } from '../components/LibrarySyncProvider';
+import { useLibrarySync } from '../lib/librarySyncContext';
 
 type Tab = 'lesson' | 'reference' | 'glossary';
 
@@ -34,11 +36,30 @@ export function LessonDetailPage() {
   const generation = useGenerationProgress();
   const { t } = useTranslation();
   const refWrapperRef = useRef<HTMLDivElement>(null);
+  const librarySync = useLibrarySync();
 
   useEffect(() => {
     if (lessonId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
+
+  useEffect(() => {
+    if (!lessonId || !librarySync.revision) return;
+    let current = true;
+    void Promise.all([
+      db.lessons.get(lessonId),
+      db.references.where('sourceLessonId').equals(lessonId).first(),
+      db.glossaryTerms.where('workspaceId').equals(workspaceId!).toArray(),
+      db.syllabusItems.where('workspaceId').equals(workspaceId!).toArray(),
+    ]).then(([restored, ref, allTerms, items]) => {
+      if (!current) return;
+      setLesson(restored || null);
+      setReference(ref || null);
+      setTerms(allTerms.filter(term => term.sourceLessonId === lessonId));
+      setLinkedItem(items.find(item => item.lessonId === lessonId) || null);
+    });
+    return () => { current = false; };
+  }, [lessonId, workspaceId, librarySync.revision]);
 
   const load = async () => {
     setLoading(true);
@@ -141,6 +162,7 @@ export function LessonDetailPage() {
   return (
     <div className="fade-in max-w-3xl pb-20">
       <FloatingLessonChat key={lesson.id} lessonId={lesson.id} lessonTitle={lesson.title} />
+      <LibrarySyncNotice />
       <div className="mb-4">
         <Link
           to={`/workspace/${workspaceId}/lessons`}

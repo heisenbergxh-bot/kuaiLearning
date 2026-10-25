@@ -27,6 +27,9 @@ class FakeSession:
     def add(self, entity: Any) -> None:
         self.added.append(entity)
 
+    async def execute(self, _statement: Any) -> None:
+        return None
+
     async def delete(self, entity: Any) -> None:
         self.deleted.append(entity)
 

@@ -35,7 +35,12 @@ export interface Lesson {
   lastViewedAt?: number;
 }
 
-export interface LearningRecord {
+export interface LibrarySyncMetadata {
+  updatedAt?: number;
+  serverSyncedAt?: number;
+}
+
+export interface LearningRecord extends LibrarySyncMetadata {
   id: string;
   workspaceId: string;
   number: number;
@@ -48,7 +53,7 @@ export interface LearningRecord {
   createdAt: number;
 }
 
-export interface GlossaryTerm {
+export interface GlossaryTerm extends LibrarySyncMetadata {
   id: string;
   workspaceId: string;
   term: string;
@@ -71,7 +76,7 @@ export interface Resource {
   createdAt: number;
 }
 
-export interface Reference {
+export interface Reference extends LibrarySyncMetadata {
   id: string;
   workspaceId: string;
   title: string;

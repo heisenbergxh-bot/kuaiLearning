@@ -1,13 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.current_user import CurrentUser, CurrentUserDependency
 from app.db.session import get_db_session
 from app.models import LearningWorkspace, Lesson, SyllabusItem
+from app.models.entities import LibraryItem
 from app.schemas import (
     LessonResponse,
     LessonWrite,
@@ -100,6 +101,11 @@ async def delete_lesson(
     )
     if lesson is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    await session.execute(
+        update(LibraryItem)
+        .where(LibraryItem.workspace_id == workspace_id, LibraryItem.source_lesson_id == lesson_id)
+        .values(is_deleted=True)
+    )
     await session.delete(lesson)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

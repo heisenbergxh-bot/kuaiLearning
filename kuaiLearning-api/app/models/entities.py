@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -109,6 +110,22 @@ class Lesson(IdMixin, TimestampMixin, Base):
     content_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
     client_updated_at_ms: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class LibraryItem(IdMixin, TimestampMixin, Base):
+    __tablename__ = "library_items"
+    __table_args__ = (Index("ix_library_workspace_kind", "workspace_id", "kind"),)
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("learning_workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_lesson_id: Mapped[str | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL"), index=True
+    )
+    content_payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    client_updated_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class KnowledgeSource(IdMixin, TimestampMixin, Base):

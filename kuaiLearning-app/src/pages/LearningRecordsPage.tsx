@@ -5,6 +5,8 @@ import type { LearningRecord, Lesson } from '../types';
 import { db, generateId } from '../db';
 import { LibraryTools, LibraryNoResults } from '../components/LibraryTools';
 import { localDayKey, matchesLibraryCourse, matchesLibrarySearch } from '../lib/libraryView';
+import { LibrarySyncNotice } from '../components/LibrarySyncProvider';
+import { useLibrarySync } from '../lib/librarySyncContext';
 
 export function LearningRecordsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -20,10 +22,10 @@ export function LearningRecordsPage() {
   const [query, setQuery] = useState('');
   const [course, setCourse] = useState('all');
   const resetFilters = () => { setQuery(''); setCourse('all'); };
+  const librarySync = useLibrarySync();
 
 
   const loadRecords = useCallback(async () => {
-    setLoading(true);
     const [result, courses] = await Promise.all([
       db.learningRecords.where('workspaceId').equals(workspaceId!).toArray(),
       db.lessons.where('workspaceId').equals(workspaceId!).toArray(),
@@ -35,8 +37,11 @@ export function LearningRecordsPage() {
 
   useEffect(() => {
     setQuery(''); setCourse('all'); setShowForm(false);
+  }, [workspaceId]);
+
+  useEffect(() => {
     if (workspaceId) void loadRecords();
-  }, [workspaceId, loadRecords]);
+  }, [workspaceId, loadRecords, librarySync.revision]);
 
   const handleCreate = async () => {
     if (!workspaceId || !title.trim() || !content.trim()) return;
@@ -63,12 +68,12 @@ export function LearningRecordsPage() {
     setShowForm(false);
     resetFilters();
     await loadRecords();
+    await librarySync.refresh();
   };
 
   const handleDelete = async (id: string) => {
     if (confirm(t('deleteRecordConfirm'))) {
-      await db.learningRecords.delete(id);
-      await loadRecords();
+      if (await librarySync.remove('records', id)) await loadRecords();
     }
   };
 
@@ -111,6 +116,7 @@ export function LearningRecordsPage() {
 
       {records.length > 0 && <LibraryTools query={query} onQuery={setQuery} course={course} onCourse={setCourse} lessons={lessons} sourceIds={records.map(record => record.sourceLessonId)} count={filtered.length} total={records.length} onReset={resetFilters} />}
 
+      <LibrarySyncNotice />
       {showForm && (
         <div className="mb-6 p-4 rounded-xl border border-[var(--color-accent-border)] bg-[var(--color-bg-card)] space-y-3">
           <input

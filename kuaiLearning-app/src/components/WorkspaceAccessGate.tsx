@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useParams } from 'react-router-dom';
 import { useWorkspaceStore } from '../stores/useWorkspaceStore';
+import { LibrarySyncProvider } from './LibrarySyncProvider';
 
 export function WorkspaceAccessGate() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -10,7 +11,7 @@ export function WorkspaceAccessGate() {
   }
 
   if (workspaceId && workspaces.some(workspace => workspace.id === workspaceId)) {
-    return <Outlet />;
+    return <LibrarySyncProvider key={workspaceId} workspaceId={workspaceId}><Outlet /></LibrarySyncProvider>;
   }
 
   const target = activeId || workspaces[0]?.id;
